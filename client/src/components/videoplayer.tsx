@@ -11,9 +11,9 @@ interface VideoPlayerProps {
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, poster, autoPlay }) => {
   return (
-    <div className="w-full bg-black flex justify-center items-center">
+    <div className="w-full bg-black rounded-2xl overflow-hidden aspect-video shadow-md relative flex justify-center items-center">
       <video
-        className="w-full max-h-[70vh]"
+        className="w-full h-full object-contain"
         src={src}
         poster={poster}
         controls
