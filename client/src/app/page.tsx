@@ -3,6 +3,7 @@ import { useState } from "react";
 import Header from "@/components/header";
 import Sidebar from "@/components/sidebar";
 import VideoGrid from "@/components/videogrid";
+import CategoryTabs from "@/components/category-tab"
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -10,6 +11,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen">
       <Header toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <CategoryTabs />
 
       <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && <Sidebar />}
