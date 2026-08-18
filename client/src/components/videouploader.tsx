@@ -12,7 +12,7 @@ interface VideoUploaderProps {
   channelName: string;
 }
 
-const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId, channelName }) => {
+const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, channelName: _channelName }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);

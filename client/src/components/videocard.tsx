@@ -18,13 +18,20 @@ interface VideoCardProps {
 }
 
 export default function VideoCard({ video }: VideoCardProps) {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const videoSrc = video.filepath
+    ? video.filepath.startsWith("http") || video.filepath.startsWith("/")
+      ? video.filepath
+      : `${backendUrl ? backendUrl : ""}/${video.filepath}`
+    : "/assets/vdo.mp4";
+
   return (
     <Link href={`/watch/${video._id}`} className="group">
       <div className="space-y-3">
         {/* 🔧 TODO: Replace with backend thumbnail or preview */}
         <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
           <video
-            src={`${process.env.NEXT_PUBLIC_BACKEND_URL}/${video.filepath}`}
+            src={videoSrc}
             className="object-cover group-hover:scale-105 transition-transform duration-200"
           />
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 rounded">

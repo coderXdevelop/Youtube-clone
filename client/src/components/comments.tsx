@@ -27,10 +27,8 @@ const fakeUser = {
 };
 
 
-const COMMENT_ALLOWED_REGEX = new RegExp(
-  String.raw`^[\p{L}\p{N}\s.,?!:;'"\-()/]+$`,
-  "u"
-);
+// Allow non-empty comment text
+const COMMENT_ALLOWED_REGEX = /^\s*\S+/;
 
 const fakeApi = {
   getComments: (videoId: string) =>
@@ -71,7 +69,7 @@ const fakeApi = {
       setTimeout(() => resolve(body), 300);
     }),
 
-  deleteComment: (id: string) =>
+  deleteComment: (_id: string) =>
     new Promise<boolean>((resolve) => {
       setTimeout(() => resolve(true), 300);
     }),
@@ -100,11 +98,16 @@ const Comments = ({ videoId }: { videoId: string }) => {
 
   // Load comments
   useEffect(() => {
-    setLoading(true);
+    let isMounted = true;
     fakeApi.getComments(videoId).then((data) => {
-      setComments(data);
-      setLoading(false);
+      if (isMounted) {
+        setComments(data);
+        setLoading(false);
+      }
     });
+    return () => {
+      isMounted = false;
+    };
   }, [videoId]);
 
   // Create comment

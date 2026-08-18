@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, X, Clock } from "lucide-react";
@@ -25,61 +25,42 @@ interface HistoryItem {
   createdAt: string;
 }
 
+const INITIAL_HISTORY: HistoryItem[] = [
+  {
+    _id: "h1",
+    videoid: {
+      _id: "v1",
+      videotitle: "Amazing Nature Documentary",
+      videochanel: "Nature Channel",
+      views: 45000,
+      createdAt: new Date().toISOString(),
+      filepath: "/assets/vdo.mp4",
+    },
+    createdAt: new Date().toISOString(),
+  },
+  {
+    _id: "h2",
+    videoid: {
+      _id: "v2",
+      videotitle: "Ocean Wonders",
+      videochanel: "Marine Life",
+      views: 12000,
+      createdAt: new Date().toISOString(),
+      filepath: "/assets/vdo.mp4",
+    },
+    createdAt: new Date().toISOString(),
+  },
+];
+
 export default function HistoryContent() {
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<HistoryItem[]>(INITIAL_HISTORY);
+  const [loading] = useState(false);
 
   // Fake user for now
-const user = { _id: "demo123", name: "Demo User" };
-
-useEffect(() => {
-  if (user) {
-    loadHistory();
-  }
-}, []); // ✅ only runs once
-
-
-  const loadHistory = async () => {
-    if (!user) return;
-
-    try {
-      // Fake data for now
-      const fakeHistory: HistoryItem[] = [
-        {
-          _id: "h1",
-          videoid: {
-            _id: "v1",
-            videotitle: "Amazing Nature Documentary",
-            videochanel: "Nature Channel",
-            views: 45000,
-            createdAt: new Date().toISOString(),
-            filepath: "/assets/vdo.mp4",
-          },
-          createdAt: new Date().toISOString(),
-        },
-        {
-          _id: "h2",
-          videoid: {
-            _id: "v2",
-            videotitle: "Ocean Wonders",
-            videochanel: "Marine Life",
-            views: 12000,
-            createdAt: new Date().toISOString(),
-            filepath: "/assets/vdo.mp4",
-          },
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      setHistory(fakeHistory);
-    } catch (error) {
-      console.error("Error loading history:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const user = { _id: "demo123", name: "Demo User" };
 
   const handleRemoveFromHistory = (historyId: string) => {
-    setHistory(history.filter((item) => item._id !== historyId));
+    setHistory((prev) => prev.filter((item) => item._id !== historyId));
   };
 
   if (loading) {
@@ -94,7 +75,7 @@ useEffect(() => {
           Keep track of what you watch
         </h2>
         <p className="text-gray-600">
-          Watch history isn't viewable when signed out.
+          Watch history isn&apos;t viewable when signed out.
         </p>
       </div>
     );
@@ -145,17 +126,15 @@ useEffect(() => {
             </div>
 
             <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                }
-              />
+              <DropdownMenuTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
 
 
               <DropdownMenuContent align="end">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, X, Clock, Play } from "lucide-react";
@@ -12,9 +12,37 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface WatchLaterItem {
+    _id: string;
+    createdAt: string;
+    videoid: {
+        _id: string;
+        videotitle: string;
+        videochanel: string;
+        views: number;
+        createdAt: string;
+        filepath: string;
+    };
+}
+
+const INITIAL_WATCH_LATER: WatchLaterItem[] = [
+    {
+        _id: "wl1",
+        createdAt: new Date().toISOString(),
+        videoid: {
+            _id: "vid1",
+            videotitle: "Demo Watch Later Video",
+            videochanel: "Sample Channel",
+            views: 9876,
+            createdAt: new Date().toISOString(),
+            filepath: "video/vdo.mp4",
+        },
+    },
+];
+
 export default function WatchLaterContent() {
-    const [watchLater, setWatchLater] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [watchLater, setWatchLater] = useState<WatchLaterItem[]>(INITIAL_WATCH_LATER);
+    const [loading] = useState(false);
     const fakeUser = {
         _id: "demo123",
         name: "Demo User",
@@ -23,29 +51,8 @@ export default function WatchLaterContent() {
 
     const user = fakeUser;
 
-    useEffect(() => {
-        if (user) {
-            // Fake data for now, replace with backend call later
-            setWatchLater([
-                {
-                    _id: "wl1",
-                    createdAt: new Date().toISOString(),
-                    videoid: {
-                        _id: "vid1",
-                        videotitle: "Demo Watch Later Video",
-                        videochanel: "Sample Channel",
-                        views: 9876,
-                        createdAt: new Date().toISOString(),
-                        filepath: "video/vdo.mp4",
-                    },
-                },
-            ]);
-            setLoading(false);
-        }
-    }, [user]);
-
     const handleRemoveFromWatchLater = (watchLaterId: string) => {
-        setWatchLater(watchLater.filter((item) => item._id !== watchLaterId));
+        setWatchLater((prev) => prev.filter((item) => item._id !== watchLaterId));
     };
 
     if (!user) {
@@ -115,17 +122,15 @@ export default function WatchLaterContent() {
                         </div>
 
                         <DropdownMenu>
-                            <DropdownMenuTrigger
-                                render={
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="opacity-0 group-hover:opacity-100"
-                                    >
-                                        <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                }
-                            />
+                            <DropdownMenuTrigger>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="opacity-0 group-hover:opacity-100"
+                                >
+                                    <MoreVertical className="w-4 h-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                     onClick={() => handleRemoveFromWatchLater(item._id)}

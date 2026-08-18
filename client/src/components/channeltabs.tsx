@@ -12,7 +12,7 @@ const tabs = [
     { id: "downloads", label: "Downloads" }, // ✅ Added downloads tab
 ];
 
-const Channeltabs = ({ userId }: { userId: string }) => {
+const Channeltabs = ({ userId: _userId }: { userId: string }) => {
     const [activeTab, setActiveTab] = useState("videos");
 
     return (

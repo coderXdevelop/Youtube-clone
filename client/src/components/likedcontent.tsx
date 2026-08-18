@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, X, ThumbsUp, Play } from "lucide-react";
@@ -12,9 +12,37 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+interface LikedVideoItem {
+    _id: string;
+    createdAt: string;
+    videoid: {
+        _id: string;
+        videotitle: string;
+        videochanel: string;
+        views: number;
+        createdAt: string;
+        filepath: string;
+    };
+}
+
+const INITIAL_LIKED_VIDEOS: LikedVideoItem[] = [
+    {
+        _id: "like1",
+        createdAt: new Date().toISOString(),
+        videoid: {
+            _id: "vid1",
+            videotitle: "Sample Video Title",
+            videochanel: "Demo Channel",
+            views: 12345,
+            createdAt: new Date().toISOString(),
+            filepath: "video/vdo.mp4",
+        },
+    },
+];
+
 export default function LikedVideosContent() {
-    const [likedVideos, setLikedVideos] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [likedVideos, setLikedVideos] = useState<LikedVideoItem[]>(INITIAL_LIKED_VIDEOS);
+    const [loading] = useState(false);
 
     // Temporary stub until AuthContext is ready
     const fakeUser = {
@@ -25,30 +53,9 @@ export default function LikedVideosContent() {
 
     const user = fakeUser;
 
-    useEffect(() => {
-        if (user) {
-            // Fake data for now, replace with backend call later
-            setLikedVideos([
-                {
-                    _id: "like1",
-                    createdAt: new Date().toISOString(),
-                    videoid: {
-                        _id: "vid1",
-                        videotitle: "Sample Video Title",
-                        videochanel: "Demo Channel",
-                        views: 12345,
-                        createdAt: new Date().toISOString(),
-                        filepath: "video/vdo.mp4",
-                    },
-                },
-            ]);
-            setLoading(false);
-        }
-    }, [user]);
-
-    const handleUnlikeVideo = (videoId: string, likedVideoId: string) => {
+    const handleUnlikeVideo = (_videoId: string, likedVideoId: string) => {
         if (!user) return;
-        setLikedVideos(likedVideos.filter((item) => item._id !== likedVideoId));
+        setLikedVideos((prev) => prev.filter((item) => item._id !== likedVideoId));
     };
 
     if (!user) {
@@ -116,17 +123,15 @@ export default function LikedVideosContent() {
                         </div>
 
                         <DropdownMenu>
-                            <DropdownMenuTrigger
-                                render={
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="opacity-0 group-hover:opacity-100"
-                                    >
-                                        <MoreVertical className="w-4 h-4" />
-                                    </Button>
-                                }
-                            />
+                            <DropdownMenuTrigger>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="opacity-0 group-hover:opacity-100"
+                                >
+                                    <MoreVertical className="w-4 h-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                     onClick={() =>

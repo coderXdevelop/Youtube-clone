@@ -1,7 +1,7 @@
 "use client";
 
 import HistoryContent from "@/components/historycontent";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense } from "react";
 
 const index = () => {
   return (

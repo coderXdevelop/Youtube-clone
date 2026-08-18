@@ -1,6 +1,6 @@
 "use client"
 import LikedContent from "@/components/likedcontent";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense } from "react";
 
 const index = () => {
     return (
