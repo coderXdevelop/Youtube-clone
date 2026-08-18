@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import React, { ChangeEvent, FormEvent, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -16,26 +16,66 @@ import { Button } from "./ui/button";
 /* import axiosInstance from "@/lib/axiosinstance";
 import { useUser } from "@/lib/AuthContext"; */
 
-const Channeldialogue = ({ isopen, onclose, channeldata, mode }: any) => {
-    // 🔧 Fake user for now — replace with AuthContext later
-    const user: any = {
+interface ChannelData {
+    name?: string;
+    description?: string;
+}
+
+interface ChannelDialogProps {
+    isopen: boolean;
+    onclose: () => void;
+    channeldata?: ChannelData | null;
+    mode?: "create" | "edit";
+}
+
+const Channeldialogue: React.FC<ChannelDialogProps> = ({
+    isopen,
+    onclose,
+    channeldata,
+    mode = "create",
+}) => {
+    const user: {
+        _id: string;
+        name: string;
+        email: string;
+        image: string;
+        channelname: string;
+    } | null = {
         _id: "1",
         name: "John Doe",
         email: "john@example.com",
         image: "https://github.com/shadcn.png?height=32&width=32",
-        channelname: "",
+        channelname: "", // empty means no channel yet
     };
 
     // const { user, login } = useUser(); // uncomment when backend ready
     const router = useRouter();
 
-    const [formData, setFormData] = useState({
-        name: "",
-        description: "",
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [prevProps, setPrevProps] = useState<{
+        channeldata?: ChannelData | null;
+        mode?: string;
+        isopen?: boolean;
+    }>({ channeldata, mode, isopen });
 
-    useEffect(() => {
+    const [formData, setFormData] = useState(() => {
+        if (channeldata && mode === "edit") {
+            return {
+                name: channeldata.name || "",
+                description: channeldata.description || "",
+            };
+        }
+        return {
+            name: user?.name || "",
+            description: "",
+        };
+    });
+
+    if (
+        prevProps.channeldata !== channeldata ||
+        prevProps.mode !== mode ||
+        prevProps.isopen !== isopen
+    ) {
+        setPrevProps({ channeldata, mode, isopen });
         if (channeldata && mode === "edit") {
             setFormData({
                 name: channeldata.name || "",
@@ -47,7 +87,9 @@ const Channeldialogue = ({ isopen, onclose, channeldata, mode }: any) => {
                 description: "",
             });
         }
-    }, [channeldata]);
+    }
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (
         e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
