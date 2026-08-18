@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useRouter } from "next/navigation";
 import { useEnvironment } from "@/lib/EnvironmentContext";
 import { cn } from "@/lib/utils";
+import Channeldialogue from "./channeldialog";
 
 interface UserData {
     _id: string;
@@ -36,7 +37,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         name: "John Doe",
         email: "john@example.com",
         image: "https://github.com/shadcn.png?height=32&width=32",
-        channelname: "John's Channel",
+        channelname: "channel",
     };
 
     const logout = () => {
@@ -51,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     const isLight = theme === "light";
 
     const [searchQuery, setSearchQuery] = useState("");
-    const [_isDialogueOpen, setIsDialogueOpen] = useState(false);
+    const [isDialogueOpen, setIsDialogueOpen] = useState(false);
     const router = useRouter();
 
     const handleSearch = (e: React.FormEvent) => {
@@ -154,16 +155,11 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                             <Bell className="w-6 h-6" />
                         </Button>
                         <DropdownMenu>
-                            <DropdownMenuTrigger >
-                                <Button
-                                    variant="ghost"
-                                    className="relative h-8 w-8 rounded-full"
-                                >
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarImage src={user.image} />
-                                        <AvatarFallback>{user.name?.[0] || "U"}</AvatarFallback>
-                                    </Avatar>
-                                </Button>
+                            <DropdownMenuTrigger className="relative h-8 w-8 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors outline-none cursor-pointer">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage src={user.image} />
+                                    <AvatarFallback>{user.name?.[0] || "U"}</AvatarFallback>
+                                </Avatar>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56" align="end">
                                 {user?.channelname ? (
@@ -210,12 +206,12 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                 )}
             </div>
 
-            {/* Channel Dialogue 
+            {/* Channel Dialogue */}
             <Channeldialogue
                 isopen={isDialogueOpen}
                 onclose={() => setIsDialogueOpen(false)}
                 mode="create"
-            />*/}
+            />
         </header>
     );
 };
