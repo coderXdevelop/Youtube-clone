@@ -1,40 +1,53 @@
-'use client'
-import React from "react";
+"use client";
+
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+import { Avatar, AvatarFallback } from "./ui/avatar";
 
-type VideoCardProps = {
-  id: string;       // unique video id
-  title: string;
-  channel: string;
-  views: string;
-  timeAgo: string;
-};
+export interface Video {
+  _id: string;
+  videotitle: string;
+  videochanel: string;
+  views: number;
+  createdAt: string;
+  filepath: string;
+}
 
-const VideoCard = ({ id, title, channel, views, timeAgo }: VideoCardProps) => {
+interface VideoCardProps {
+  video: Video;
+}
+
+export default function VideoCard({ video }: VideoCardProps) {
   return (
-    <Link href={`/watch/${id}`} className="block">
-      <div className="bg-white rounded-lg shadow-sm hover:shadow-md cursor-pointer">
-        {/* Fake thumbnail */}
-        <div className="w-full h-40 bg-gray-300 rounded-t-lg flex items-center justify-center text-gray-700 text-sm">
-          Thumbnail for {title}
+    <Link href={`/watch/${video._id}`} className="group">
+      <div className="space-y-3">
+        {/* 🔧 TODO: Replace with backend thumbnail or preview */}
+        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+          <video
+            src={`${process.env.NEXT_PUBLIC_BACKEND_URL}/${video.filepath}`}
+            className="object-cover group-hover:scale-105 transition-transform duration-200"
+          />
+          <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-1 rounded">
+            10:24
+          </div>
         </div>
 
-        {/* Info */}
-        <div className="p-3 flex gap-3">
-          <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-xs text-white">
-            {channel[0]}
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold line-clamp-2">{title}</h3>
-            <p className="text-xs text-gray-600">{channel}</p>
-            <p className="text-xs text-gray-600">
-              {views} • {timeAgo}
+        <div className="flex gap-3">
+          <Avatar className="w-9 h-9 flex-shrink-0">
+            <AvatarFallback>{video.videochanel[0]}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-sm line-clamp-2 group-hover:text-blue-600">
+              {video.videotitle}
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">{video.videochanel}</p>
+            <p className="text-sm text-gray-600">
+              {video.views.toLocaleString()} views •{" "}
+              {formatDistanceToNow(new Date(video.createdAt))} ago
             </p>
           </div>
         </div>
       </div>
     </Link>
   );
-};
-
-export default VideoCard;
+}
