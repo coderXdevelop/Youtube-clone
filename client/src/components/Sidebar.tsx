@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Home, Compass, PlaySquare, Clock, ThumbsUp, User } from "lucide-react";
 import { Button } from "./ui/button";
 import React, { useState } from "react";
-import Channeldialogue from "./channeldialog";
+import Channeldialogue from "./ChannelDialog";
 
 // Fake user for now — replace with backend later
 const user: {

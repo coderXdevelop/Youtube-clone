@@ -1,10 +1,10 @@
 "use client";
 
-import ChannelHeader from "@/components/channelheader";
-import Channeltabs from "@/components/channeltabs";
-import ChannelVideos from "@/components/channelvideos";
-import VideoUploader from "@/components/videouploader";
-import { Video } from "@/components/videocard";
+import ChannelHeader from "@/components/ChannelHeader";
+import Channeltabs from "@/components/Channeltabs";
+import ChannelVideos from "@/components/ChannelVideos";
+import VideoUploader from "@/components/VideoUploader";
+import { Video } from "@/components/VideoCard";
 import { notFound, useParams } from "next/navigation";
 import React from "react";
 

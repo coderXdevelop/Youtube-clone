@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Videocard from "./videocard";
+import Videocard from "./VideoCard";
 // import axiosInstance from "@/lib/axiosinstance"; // 🔧 Uncomment when backend is ready
 
 interface Video {

@@ -16,7 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useRouter } from "next/navigation";
 import { useEnvironment } from "@/lib/EnvironmentContext";
 import { cn } from "@/lib/utils";
-import Channeldialogue from "./channeldialog";
+import Channeldialogue from "./ChannelDialog";
 
 interface UserData {
     _id: string;

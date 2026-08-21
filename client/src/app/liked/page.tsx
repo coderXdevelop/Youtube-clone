@@ -1,5 +1,5 @@
 "use client"
-import LikedContent from "@/components/likedcontent";
+import LikedContent from "@/components/LikedContent";
 import React, { Suspense } from "react";
 
 const index = () => {

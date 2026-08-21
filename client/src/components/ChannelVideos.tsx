@@ -1,5 +1,5 @@
 import React from "react";
-import VideoCard, { Video } from "./videocard";
+import VideoCard, { Video } from "./VideoCard";
 
 interface ChannelVideosProps {
     videos: Video[];

@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import React from "react";
-import Header from "@/components/header";
-import Sidebar from "@/components/sidebar";
-import VideoPlayer from "@/components/videoplayer";
-import VideoInfo from "@/components/videoinfo";
-import Comments from "@/components/comments"; 
-import RelatedVideos from "@/components/relatedvideos";
+import Header from "@/components/Header";
+import Sidebar from "@/components/Sidebar";
+import VideoPlayer from "@/components/VideoPlayer";
+import VideoInfo from "@/components/VideoInfo";
+import Comments from "@/components/Comments";
+import RelatedVideos from "@/components/RelatedVideos";
 
 export default function WatchPage({ params }: { params: Promise<{ id: string }> }) {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -93,7 +93,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
                 initialDislikes={videoData.initialDislikes}
               />
               <div className="mt-4">
-                <Comments videoId={id} /> 
+                <Comments videoId={id} />
               </div>
             </div>
 

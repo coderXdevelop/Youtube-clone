@@ -1,5 +1,5 @@
 "use client"
-import WatchLaterContent from "@/components/watchlatercontent";
+import WatchLaterContent from "@/components/WatchLaterContent";
 import { Suspense } from "react";
 
 export default function WatchLaterPage() {
