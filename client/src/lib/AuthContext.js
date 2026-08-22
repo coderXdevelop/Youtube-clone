@@ -1,3 +1,5 @@
+"use client";
+
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { useState } from "react";
 import { createContext } from "react";
@@ -91,4 +93,10 @@ export const UserProvider = ({ children }) => {
     );
 };
 
-export const useUser = () => useContext(UserContext);
+export const useUser = () => {
+    const context = useContext(UserContext);
+    if (!context) {
+        return { user: null, loading: false, login: () => {}, logout: () => {}, handlegooglesignin: () => {} };
+    }
+    return context;
+};
