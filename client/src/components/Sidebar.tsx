@@ -4,25 +4,11 @@ import { Home, Compass, PlaySquare, Clock, ThumbsUp, User } from "lucide-react";
 import { Button } from "./ui/button";
 import React, { useState } from "react";
 import Channeldialogue from "./ChannelDialog";
-
-// Fake user for now — replace with backend later
-const user: {
-    _id: string;
-    name: string;
-    email: string;
-    image: string;
-    channelname: string;
-} | null = {
-    _id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    image: "https://github.com/shadcn.png?height=32&width=32",
-    channelname: "", // empty means no channel yet
-};
+import { useUser } from "@/lib/AuthContext";
 
 const Sidebar = () => {
     const [isDialogueOpen, setIsDialogueOpen] = useState(false);
-
+    const { user } = useUser();
     return (
         <>
             <aside className="w-56 h-[calc(100vh-3.5rem)] bg-white flex flex-col py-2 px-3 select-none flex-shrink-0">

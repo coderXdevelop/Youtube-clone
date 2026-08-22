@@ -1,13 +1,13 @@
-import dotenv from "dotenv";
-dotenv.config();
 import axios from "axios";
 
-const API_URL = process.env.BACKEND_URL;
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
 const axiosInstance = axios.create({
     baseURL: API_URL,
     withCredentials: true,
     headers: {
         "Content-Type": "application/json",
     }
-})
-export default axiosInstance
+});
+
+export default axiosInstance;

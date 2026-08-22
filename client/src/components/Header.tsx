@@ -17,36 +17,14 @@ import { useRouter } from "next/navigation";
 import { useEnvironment } from "@/lib/EnvironmentContext";
 import { cn } from "@/lib/utils";
 import Channeldialogue from "./ChannelDialog";
-
-interface UserData {
-    _id: string;
-    name: string;
-    email: string;
-    image: string;
-    channelname?: string;
-}
+import { useUser } from "@/lib/AuthContext";
 
 interface HeaderProps {
     toggleSidebar?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
-    // 🔧 Fake user for now — replace with AuthContext later
-    const user: UserData | null = {
-        _id: "1",
-        name: "John Doe",
-        email: "john@example.com",
-        image: "https://github.com/shadcn.png?height=32&width=32",
-        channelname: "channel",
-    };
-
-    const logout = () => {
-        console.log("Fake logout triggered");
-    };
-
-    const handlegooglesignin = () => {
-        console.log("Fake Google sign-in triggered");
-    };
+    const { user, logout, handlegooglesignin } = useUser();
 
     const { theme } = useEnvironment();
     const isLight = theme === "light";

@@ -7,25 +7,29 @@ const userSchema = new mongoose.Schema({
     },
     email: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     channelname: {
         type: String,
-        required: true
+        default: ""
     },
     discription: {
         type: String,
-        required: true
+        default: ""
     },
     avatar: {
         type: String,
-        required: true
+        default: ""
+    },
+    image: {
+        type: String,
+        default: ""
     },
     joinedon: {
         type: Date,
         default: Date.now
     },
-
 })
 
 const User = mongoose.model("User", userSchema);

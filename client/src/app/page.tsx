@@ -4,7 +4,7 @@ import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import VideoGrid from "@/components/VideoGrid";
 import CategoryTabs from "@/components/Category-tab"
-import { UserProvider } from "@/lib/authcontext"
+import { UserProvider } from "@/lib/AuthContext";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);

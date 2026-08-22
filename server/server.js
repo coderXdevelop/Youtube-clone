@@ -10,7 +10,11 @@ connectToDB();
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors());
+const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+app.use(cors({
+    origin: [clientUrl, "http://localhost:3000", "http://127.0.0.1:3000"],
+    credentials: true
+}));
 app.use(express.json());
 app.use(bodyParser.json({ limit: "50mb", extended: true }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
@@ -19,7 +23,7 @@ app.get("/", (req, res) => {
     res.send("Hello World")
 })
 
-app.use("/api/auth", authRoute);
+app.use("/api/user", authRoute);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
