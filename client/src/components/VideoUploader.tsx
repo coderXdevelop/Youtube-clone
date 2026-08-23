@@ -1,3 +1,5 @@
+"use client"
+
 import { Check, FileVideo, Upload, X } from "lucide-react";
 import React, { ChangeEvent, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -5,22 +7,22 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
-// import axiosInstance from "@/lib/axiosinstance"; // 🔧 Uncomment when backend is ready
+import axiosInstance from "@/lib/AxiosInstance";
+import { AxiosProgressEvent } from "axios";
 
 interface VideoUploaderProps {
-  channelId: string;
-  channelName: string;
+  channelId?: string;
+  channelName?: string;
 }
 
-const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, channelName: _channelName }) => {
+const VideoUploader = ({ channelId, channelName }: VideoUploaderProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [uploadComplete, setUploadComplete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handlefilechange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
@@ -33,71 +35,63 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, ch
         return;
       }
       setVideoFile(file);
-      if (!videoTitle) setVideoTitle(file.name);
+      const filename = file.name;
+      if (!videoTitle) {
+        setVideoTitle(filename);
+      }
     }
   };
-
   const resetForm = () => {
     setVideoFile(null);
     setVideoTitle("");
     setIsUploading(false);
     setUploadProgress(0);
     setUploadComplete(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
-
   const cancelUpload = () => {
     if (isUploading) {
       toast.error("Your video upload has been cancelled");
-      setIsUploading(false);
     }
   };
-
   const handleUpload = async () => {
     if (!videoFile || !videoTitle.trim()) {
       toast.error("Please provide file and title");
       return;
     }
-
-    // 🔧 TODO: Replace with your backend API call
-    // Example:
-    // const formData = new FormData();
-    // formData.append("file", videoFile);
-    // formData.append("videotitle", videoTitle);
-    // formData.append("videochannel", channelName);
-    // formData.append("uploader", channelId);
-    //
-    // try {
-    //   setIsUploading(true);
-    //   setUploadProgress(0);
-    //   await axiosInstance.post("/video/upload", formData, {
-    //     headers: { "Content-Type": "multipart/form-data" },
-    //     onUploadProgress: (progressEvent: ProgressEvent) => {
-    //       if (progressEvent.total) {
-    //         const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-    //         setUploadProgress(progress);
-    //       }
-    //     },
-    //   });
-    //   toast.success("Upload successful");
-    //   setUploadComplete(true);
-    // } catch (error) {
-    //   console.error("Error uploading video:", error);
-    //   toast.error("There was an error uploading your video. Please try again.");
-    // } finally {
-    //   setIsUploading(false);
-    // }
-
-    // Temporary mock success until backend is ready:
-    setIsUploading(true);
-    setTimeout(() => {
-      setUploadProgress(100);
-      setUploadComplete(true);
+    const formdata = new FormData();
+    formdata.append("file", videoFile);
+    formdata.append("videotitle", videoTitle);
+    formdata.append("videochanel", channelName || "");
+    formdata.append("uploader", channelId || "");
+    console.log(formdata)
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      const res = await axiosInstance.post("/video/upload", formdata, {
+        headers: {
+          "Content-Type": "multipart/form-data", // ✅ MUST for FormData
+        },
+        onUploadProgress: (progresEvent: AxiosProgressEvent) => {
+          if (progresEvent.total) {
+            const progress = Math.round(
+              (progresEvent.loaded * 100) / progresEvent.total
+            );
+            setUploadProgress(progress);
+          }
+        },
+      });
+      toast.success("Upload successfully");
+      resetForm();
+    } catch (error) {
+      console.error("Error uploading video:", error);
+      toast.error("There was an error uploading your video. Please try again.");
+    } finally {
       setIsUploading(false);
-      toast.success("Mock upload complete (backend pending)");
-    }, 2000);
+    }
   };
-
   return (
     <div className="bg-gray-50 rounded-lg p-6">
       <h2 className="text-xl font-semibold mb-4">Upload a video</h2>
@@ -109,20 +103,25 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, ch
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-            <p className="text-lg font-medium">Drag and drop video files to upload</p>
-            <p className="text-sm text-gray-500 mt-1">or click to select files</p>
-            <p className="text-xs text-gray-400 mt-4">MP4, WebM, MOV or AVI • Up to 100MB</p>
+            <p className="text-lg font-medium">
+              Drag and drop video files to upload
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              or click to select files
+            </p>
+            <p className="text-xs text-gray-400 mt-4">
+              MP4, WebM, MOV or AVI • Up to 100MB
+            </p>
             <input
               type="file"
               ref={fileInputRef}
               className="hidden"
               accept="video/*"
-              onChange={handleFileChange}
+              onChange={handlefilechange}
             />
           </div>
         ) : (
           <div className="space-y-4">
-            {/* File Info */}
             <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
               <div className="bg-blue-100 p-2 rounded-md">
                 <FileVideo className="w-6 h-6 text-blue-600" />
@@ -133,8 +132,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, ch
                   {(videoFile.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
               </div>
-              {!isUploading && !uploadComplete && (
-                <Button variant="ghost" size="icon" onClick={resetForm}>
+              {!isUploading && (
+                <Button variant="ghost" size="icon" onClick={cancelUpload}>
                   <X className="w-5 h-5" />
                 </Button>
               )}
@@ -145,20 +144,20 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, ch
               )}
             </div>
 
-            {/* Title Input */}
-            <div>
-              <Label htmlFor="title">Title (required)</Label>
-              <Input
-                id="title"
-                value={videoTitle}
-                onChange={(e) => setVideoTitle(e.target.value)}
-                placeholder="Add a title that describes your video"
-                disabled={isUploading || uploadComplete}
-                className="mt-1"
-              />
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="title">Title (required)</Label>
+                <Input
+                  id="title"
+                  value={videoTitle}
+                  onChange={(e) => setVideoTitle(e.target.value)}
+                  placeholder="Add a title that describes your video"
+                  disabled={isUploading || uploadComplete}
+                  className="mt-1"
+                />
+              </div>
             </div>
 
-            {/* Progress */}
             {isUploading && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -169,16 +168,17 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({ channelId: _channelId, ch
               </div>
             )}
 
-            {/* Actions */}
             <div className="flex justify-end gap-3">
               {!uploadComplete && (
                 <>
-                  <Button onClick={cancelUpload} disabled={!isUploading}>
+                  <Button onClick={cancelUpload} disabled={uploadComplete}>
                     Cancel
                   </Button>
                   <Button
                     onClick={handleUpload}
-                    disabled={isUploading || !videoTitle.trim() || uploadComplete}
+                    disabled={
+                      isUploading || !videoTitle.trim() || uploadComplete
+                    }
                   >
                     {isUploading ? "Uploading..." : "Upload"}
                   </Button>
