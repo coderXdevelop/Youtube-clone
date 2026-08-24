@@ -44,47 +44,74 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
   }
 
   useEffect(() => {
-    const handleviews = async () => {
+    let isMounted = true;
+    const handleviewsAndStatus = async () => {
       try {
         if (user) {
-          return await axiosInstance.post(`/history/${video._id}`, {
+          await axiosInstance.post(`/api/history/${video._id}`, {
             userId: user?._id,
           });
+
+          // Check if video is already liked by current user
+          const likedRes = await axiosInstance.get(`/api/like/${user._id}`);
+          if (isMounted && Array.isArray(likedRes.data)) {
+            const isAlreadyLiked = likedRes.data.some(
+              (item: { videoid?: { _id: string } | string }) =>
+                (typeof item.videoid === "object" && item.videoid?._id === video._id) ||
+                item.videoid === video._id
+            );
+            setIsLiked(isAlreadyLiked);
+          }
         } else {
-          return await axiosInstance.post(`/history/views/${video?._id}`);
+          await axiosInstance.post(`/api/history/views/${video?._id}`);
         }
       } catch (error) {
         console.log(error);
       }
     };
-    handleviews();
+    handleviewsAndStatus();
+    return () => {
+      isMounted = false;
+    };
   }, [user, video._id]);
+
   const handleLike = async () => {
     if (!user) return;
+
+    const prevIsLiked = isLiked;
+    const prevLikes = likes;
+
+    const nextIsLiked = !prevIsLiked;
+    const nextLikes = nextIsLiked ? prevLikes + 1 : Math.max(0, prevLikes - 1);
+
+    // ⚡ Optimistic UI update: change state immediately for zero lag
+    setIsLiked(nextIsLiked);
+    setlikes(nextLikes);
+
+    if (isDisliked) {
+      setIsDisliked(false);
+      setDislikes((prev) => Math.max(0, prev - 1));
+    }
+
     try {
-      const res = await axiosInstance.post(`/like/${video._id}`, {
+      const res = await axiosInstance.post(`/api/like/${video._id}`, {
         userId: user?._id,
       });
-      if (res.data.liked) {
-        if (isLiked) {
-          setlikes((prev) => prev - 1);
-          setIsLiked(false);
-        } else {
-          setlikes((prev) => prev + 1);
-          setIsLiked(true);
-          if (isDisliked) {
-            setDislikes((prev) => prev - 1);
-            setIsDisliked(false);
-          }
-        }
+
+      if (typeof res.data.liked === "boolean") {
+        setIsLiked(res.data.liked);
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error updating like status:", error);
+      // Rollback state if server request fails
+      setIsLiked(prevIsLiked);
+      setlikes(prevLikes);
     }
   };
+
   const handleWatchLater = async () => {
     try {
-      const res = await axiosInstance.post(`/watch/${video._id}`, {
+      const res = await axiosInstance.post(`/api/watch/${video._id}`, {
         userId: user?._id,
       });
       if (res.data.watchlater) {
@@ -96,27 +123,18 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       console.log(error);
     }
   };
-  const handleDislike = async () => {
+
+  const handleDislike = () => {
     if (!user) return;
-    try {
-      const res = await axiosInstance.post(`/like/${video._id}`, {
-        userId: user?._id,
-      });
-      if (!res.data.liked) {
-        if (isDisliked) {
-          setDislikes((prev) => prev - 1);
-          setIsDisliked(false);
-        } else {
-          setDislikes((prev) => prev + 1);
-          setIsDisliked(true);
-          if (isLiked) {
-            setlikes((prev) => prev - 1);
-            setIsLiked(false);
-          }
-        }
+    if (isDisliked) {
+      setIsDisliked(false);
+      setDislikes((prev) => Math.max(0, prev - 1));
+    } else {
+      setIsDisliked(true);
+      setDislikes((prev) => prev + 1);
+      if (isLiked) {
+        handleLike();
       }
-    } catch (error) {
-      console.log(error);
     }
   };
   return (
@@ -143,9 +161,8 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
               onClick={handleLike}
             >
               <ThumbsUp
-                className={`w-5 h-5 mr-2 ${
-                  isLiked ? "fill-black text-black" : ""
-                }`}
+                className={`w-5 h-5 mr-2 ${isLiked ? "fill-black text-black" : ""
+                  }`}
               />
               {likes.toLocaleString()}
             </Button>
@@ -157,9 +174,8 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
               onClick={handleDislike}
             >
               <ThumbsDown
-                className={`w-5 h-5 mr-2 ${
-                  isDisliked ? "fill-black text-black" : ""
-                }`}
+                className={`w-5 h-5 mr-2 ${isDisliked ? "fill-black text-black" : ""
+                  }`}
               />
               {dislikes.toLocaleString()}
             </Button>
@@ -167,9 +183,8 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className={`bg-gray-100 rounded-full ${
-              isWatchLater ? "text-primary" : ""
-            }`}
+            className={`bg-gray-100 rounded-full ${isWatchLater ? "text-primary" : ""
+              }`}
             onClick={handleWatchLater}
           >
             <Clock className="w-5 h-5 mr-2" />

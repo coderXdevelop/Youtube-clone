@@ -3,8 +3,12 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { connectToDB } from "./model/db.js";
-import authRoute from "./routes/authroute.js";
-import videoRoute from "./routes/videoroute.js";
+import authRoute from "./routes/authRoute.js";
+import videoRoute from "./routes/videoRoute.js";
+import commentRoute from "./routes/commentRoute.js";
+import likeRoute from "./routes/likeRoute.js";
+import historyRoute from "./routes/historyRoute.js";
+import watchlaterRoute from "./routes/watchlaterRoute.js";
 
 connectToDB();
 
@@ -23,6 +27,10 @@ app.use("/uploads", express.static("uploads"));
 
 app.use("/api/user", authRoute);
 app.use("/api/video", videoRoute);
+app.use("/api/comment", commentRoute);
+app.use("/api/like", likeRoute);
+app.use("/api/history", historyRoute);
+app.use("/api/watch", watchlaterRoute);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
