@@ -127,7 +127,7 @@ export default function LikedVideosContent() {
                             <Link href={`/watch/${videoId}`} className="flex-shrink-0">
                                 <div className="relative w-40 aspect-video bg-gray-100 rounded overflow-hidden">
                                     <video
-                                        src={`${process.env.BACKEND_URL}/${videoObj?.filepath || ""}`}
+                                        src={`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/${videoObj?.filepath || ""}`}
                                         className="object-cover group-hover:scale-105 transition-transform duration-200"
                                     />
                                 </div>

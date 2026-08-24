@@ -62,6 +62,17 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             );
             setIsLiked(isAlreadyLiked);
           }
+
+          // Check if video is already in watch later list for current user
+          const watchRes = await axiosInstance.get(`/api/watch/${user._id}`);
+          if (isMounted && Array.isArray(watchRes.data)) {
+            const isAlreadyWatchLater = watchRes.data.some(
+              (item: { videoid?: { _id: string } | string }) =>
+                (typeof item.videoid === "object" && item.videoid?._id === video._id) ||
+                item.videoid === video._id
+            );
+            setIsWatchLater(isAlreadyWatchLater);
+          }
         } else {
           await axiosInstance.post(`/api/history/views/${video?._id}`);
         }
@@ -110,17 +121,16 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
   };
 
   const handleWatchLater = async () => {
+    if (!user) return;
     try {
       const res = await axiosInstance.post(`/api/watch/${video._id}`, {
         userId: user?._id,
       });
-      if (res.data.watchlater) {
-        setIsWatchLater(!isWatchLater);
-      } else {
-        setIsWatchLater(false);
+      if (typeof res.data.watchlater === "boolean") {
+        setIsWatchLater(res.data.watchlater);
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error updating watch later status:", error);
     }
   };
 

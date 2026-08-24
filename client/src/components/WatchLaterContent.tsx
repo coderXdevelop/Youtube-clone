@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, X, Clock, Play } from "lucide-react";
@@ -11,6 +11,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import axiosInstance from "@/lib/AxiosInstance";
+import { useUser } from "@/lib/AuthContext";
 
 interface WatchLaterItem {
     _id: string;
@@ -25,34 +27,53 @@ interface WatchLaterItem {
     };
 }
 
-const INITIAL_WATCH_LATER: WatchLaterItem[] = [
-    {
-        _id: "wl1",
-        createdAt: new Date().toISOString(),
-        videoid: {
-            _id: "vid1",
-            videotitle: "Demo Watch Later Video",
-            videochanel: "Sample Channel",
-            views: 9876,
-            createdAt: new Date().toISOString(),
-            filepath: "video/vdo.mp4",
-        },
-    },
-];
-
 export default function WatchLaterContent() {
-    const [watchLater, setWatchLater] = useState<WatchLaterItem[]>(INITIAL_WATCH_LATER);
-    const [loading] = useState(false);
-    const fakeUser = {
-        _id: "demo123",
-        name: "Demo User",
-        image: "",
-    };
+    const [watchLater, setWatchLater] = useState<WatchLaterItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { user } = useUser();
 
-    const user = fakeUser;
+    useEffect(() => {
+        if (!user) return;
 
-    const handleRemoveFromWatchLater = (watchLaterId: string) => {
-        setWatchLater((prev) => prev.filter((item) => item._id !== watchLaterId));
+        let isMounted = true;
+
+        const loadWatchLater = async () => {
+            try {
+                const watchLaterData = await axiosInstance.get(`/api/watch/${user._id}`);
+                if (isMounted) {
+                    setWatchLater(watchLaterData.data);
+                }
+            } catch (error) {
+                console.error("Error loading watch later:", error);
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        loadWatchLater();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [user]);
+
+    if (loading) {
+        return <div>Loading watch later...</div>;
+    }
+
+    const handleRemoveFromWatchLater = async (videoId: string, watchLaterId: string) => {
+        try {
+            if (user?._id) {
+                await axiosInstance.post(`/api/watch/${videoId}`, {
+                    userId: user._id,
+                });
+            }
+            setWatchLater((prev) => prev.filter((item) => item._id !== watchLaterId));
+        } catch (error) {
+            console.error("Error removing from watch later:", error);
+        }
     };
 
     if (!user) {
@@ -65,10 +86,6 @@ export default function WatchLaterContent() {
                 </p>
             </div>
         );
-    }
-
-    if (loading) {
-        return <div>Loading watch later...</div>;
     }
 
     if (watchLater.length === 0) {
@@ -99,7 +116,7 @@ export default function WatchLaterContent() {
                         <Link href={`/watch/${item.videoid._id}`} className="flex-shrink-0">
                             <div className="relative w-40 aspect-video bg-gray-100 rounded overflow-hidden">
                                 <video
-                                    src={`/${item.videoid.filepath}`}
+                                    src={`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/${item.videoid?.filepath}`}
                                     className="object-cover group-hover:scale-105 transition-transform duration-200"
                                 />
                             </div>
@@ -111,7 +128,9 @@ export default function WatchLaterContent() {
                                     {item.videoid.videotitle}
                                 </h3>
                             </Link>
-                            <p className="text-sm text-gray-600">{item.videoid.videochanel}</p>
+                            <p className="text-sm text-gray-600">
+                                {item.videoid.videochanel}
+                            </p>
                             <p className="text-sm text-gray-600">
                                 {item.videoid.views.toLocaleString()} views •{" "}
                                 {formatDistanceToNow(new Date(item.videoid.createdAt))} ago
@@ -122,12 +141,20 @@ export default function WatchLaterContent() {
                         </div>
 
                         <DropdownMenu>
-                            <DropdownMenuTrigger className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="opacity-0 group-hover:opacity-100"
+                                    />
+                                }
+                            >
                                 <MoreVertical className="w-4 h-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                    onClick={() => handleRemoveFromWatchLater(item._id)}
+                                    onClick={() => handleRemoveFromWatchLater(item.videoid._id, item._id)}
                                 >
                                     <X className="w-4 h-4 mr-2" />
                                     Remove from Watch later
