@@ -1,26 +1,32 @@
-// src/components/VideoPlayer.tsx
 "use client";
 
-import React from "react";
+import { useRef } from "react";
 
 interface VideoPlayerProps {
-  src: string;          // video file URL or stream
-  poster?: string;      // thumbnail image
-  autoPlay?: boolean;
+  video: {
+    _id: string;
+    videotitle: string;
+    filepath: string;
+  };
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, poster, autoPlay }) => {
+export default function VideoPlayer({ video }: VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   return (
-    <div className="w-full bg-black rounded-2xl overflow-hidden aspect-video shadow-md relative flex justify-center items-center">
+    <div className="aspect-video bg-black rounded-lg overflow-hidden">
       <video
-        className="w-full h-full object-contain"
-        src={src}
-        poster={poster}
+        ref={videoRef}
+        className="w-full h-full"
         controls
-        autoPlay={autoPlay}
-      />
+        poster={`/placeholder.svg?height=480&width=854`}
+      >
+        <source
+          src={`${process.env.NEXT_PUBLIC_BACKEND_URL}/${video?.filepath}`}
+          type="video/mp4"
+        />
+        Your browser does not support the video tag.
+      </video>
     </div>
   );
-};
-
-export default VideoPlayer;
+}

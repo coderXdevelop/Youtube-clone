@@ -4,6 +4,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { connectToDB } from "./model/db.js";
 import authRoute from "./routes/authroute.js";
+import videoRoute from "./routes/videoroute.js";
 
 connectToDB();
 
@@ -18,12 +19,10 @@ app.use(cors({
 app.use(express.json());
 app.use(bodyParser.json({ limit: "50mb", extended: true }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-
-app.get("/", (req, res) => {
-    res.send("Hello World")
-})
+app.use("/uploads", express.static("uploads"));
 
 app.use("/api/user", authRoute);
+app.use("/api/video", videoRoute);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

@@ -70,9 +70,9 @@ const VideoUploader = ({ channelId, channelName }: VideoUploaderProps) => {
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      const res = await axiosInstance.post("/video/upload", formdata, {
+      await axiosInstance.post("/api/video/upload", formdata, {
         headers: {
-          "Content-Type": "multipart/form-data", // ✅ MUST for FormData
+          "Content-Type": "multipart/form-data",
         },
         onUploadProgress: (progresEvent: AxiosProgressEvent) => {
           if (progresEvent.total) {
