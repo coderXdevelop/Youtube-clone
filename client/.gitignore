@@ -12,12 +12,14 @@ dist/
 # testing & coverage
 coverage/
 
-# environment variables
+# environment variables & secrets
 .env
 .env.*
 !.env.example
 !.env*.example
 .env.local
+google-services.json
+**/google-services.json
 
 # debug & logs
 *.log

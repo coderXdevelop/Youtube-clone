@@ -9,6 +9,10 @@ build/
 .env
 .env.*
 
+# uploaded files
+uploads/*
+!.gitkeep
+
 # debug & logs
 *.log
 npm-debug.log*

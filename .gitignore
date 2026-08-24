@@ -14,7 +14,7 @@ dist/
 # testing & coverage
 coverage/
 
-# environment variables
+# secrets & credentials
 .env
 .env.*
 !.env.example
@@ -23,6 +23,14 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+google-services.json
+**/google-services.json
+*.json.secret
+*.json.key
+
+# uploads
+server/uploads/*
+!server/uploads/.gitkeep
 
 # debug & logs
 *.log
