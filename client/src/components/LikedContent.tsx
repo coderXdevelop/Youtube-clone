@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { MoreVertical, X, ThumbsUp, Play } from "lucide-react";
+import { MoreVertical, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -11,10 +11,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUser } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/AxiosInstance";
+import { useUser } from "@/lib/AuthContext";
 
-interface LikedVideoItem {
+interface LikedItem {
     _id: string;
     createdAt: string;
     videoid: {
@@ -24,13 +24,15 @@ interface LikedVideoItem {
         views: number;
         createdAt: string;
         filepath: string;
-    };
+        thumbnailpath?: string;
+    } | string;
 }
 
-export default function LikedVideosContent() {
-    const [likedVideos, setLikedVideos] = useState<LikedVideoItem[]>([]);
+export default function LikedContent() {
+    const [likedVideos, setLikedVideos] = useState<LikedItem[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useUser();
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
     useEffect(() => {
         if (!user) return;
@@ -40,7 +42,7 @@ export default function LikedVideosContent() {
         const loadLikedVideos = async () => {
             try {
                 const likedData = await axiosInstance.get(`/api/like/${user._id}`);
-                if (isMounted) {
+                if (isMounted && Array.isArray(likedData.data)) {
                     setLikedVideos(likedData.data);
                 }
             } catch (error) {
@@ -59,62 +61,54 @@ export default function LikedVideosContent() {
         };
     }, [user]);
 
-    const handleUnlikeVideo = async (videoId: string, likedVideoId: string) => {
-        if (!user || !videoId) return;
-
-        // ⚡ Optimistic UI update: remove item immediately for zero lag
-        setLikedVideos((prev) => prev.filter((item) => item._id !== likedVideoId));
-
+    const handleUnlikeVideo = async (videoId: string, likeId: string) => {
+        if (!user) return;
         try {
-            await axiosInstance.post(`/api/like/${videoId}`, {
-                userId: user._id,
+            await axiosInstance.post("/api/like", {
+                videoid: videoId,
+                viewer: user._id,
             });
+            setLikedVideos((prev) => prev.filter((item) => item._id !== likeId));
         } catch (error) {
             console.error("Error unliking video:", error);
-            // Rollback / refetch if network request fails
-            try {
-                const likedData = await axiosInstance.get(`/api/like/${user._id}`);
-                setLikedVideos(likedData.data);
-            } catch (err) {
-                console.error("Failed to restore liked videos:", err);
-            }
         }
     };
 
     if (!user) {
         return (
             <div className="text-center py-12">
-                <ThumbsUp className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
-                    Keep track of videos you like
-                </h2>
-                <p className="text-gray-600">Sign in to see your liked videos.</p>
+                <p className="text-gray-600 dark:text-gray-400">Please sign in to view your liked videos.</p>
             </div>
         );
     }
 
     if (loading) {
-        return <div>Loading liked videos...</div>;
+        return <div className="text-sm text-gray-500 py-6">Loading liked videos...</div>;
     }
 
     if (likedVideos.length === 0) {
         return (
             <div className="text-center py-12">
-                <ThumbsUp className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                <h2 className="text-xl font-semibold mb-2">No liked videos yet</h2>
-                <p className="text-gray-600">Videos you like will appear here.</p>
+                <p className="text-gray-600 dark:text-gray-400">No liked videos yet.</p>
             </div>
         );
     }
 
+    const firstVideo = likedVideos[0];
+    const firstVideoId = typeof firstVideo?.videoid === "object" ? firstVideo.videoid._id : firstVideo?.videoid;
+
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">{likedVideos.length} videos</p>
-                <Button className="flex items-center gap-2">
-                    <Play className="w-4 h-4" />
-                    Play all
-                </Button>
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-zinc-800">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{likedVideos.length} videos</p>
+                {firstVideoId && (
+                    <Link href={`/watch/${firstVideoId}`}>
+                        <Button size="sm" className="flex items-center gap-2 text-xs">
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            Play all
+                        </Button>
+                    </Link>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -122,44 +116,62 @@ export default function LikedVideosContent() {
                     const videoObj = typeof item.videoid === "object" ? item.videoid : null;
                     const videoId = videoObj?._id || (typeof item.videoid === "string" ? item.videoid : "");
 
+                    if (!videoObj) return null;
+
+                    const thumbUrl = videoObj.thumbnailpath
+                        ? `${backendUrl}/${videoObj.thumbnailpath.replace(/^\/+/, "")}`
+                        : "";
+                    const videoSrc = `${backendUrl}/${videoObj.filepath || ""}#t=0.5`;
+
                     return (
-                        <div key={item._id} className="flex gap-4 group">
-                            <Link href={`/watch/${videoId}`} className="flex-shrink-0">
-                                <div className="relative w-40 aspect-video bg-gray-100 rounded overflow-hidden">
-                                    <video
-                                        src={`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/${videoObj?.filepath || ""}`}
-                                        className="object-cover group-hover:scale-105 transition-transform duration-200"
-                                    />
+                        <div key={item._id} className="flex gap-4 group items-start">
+                            <Link href={`/watch/${videoId}`} className="shrink-0">
+                                <div className="relative w-40 aspect-video bg-black/90 rounded-xl overflow-hidden shadow-sm">
+                                    {thumbUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={thumbUrl}
+                                            alt={videoObj.videotitle}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                        />
+                                    ) : (
+                                        <video
+                                            src={videoSrc}
+                                            preload="metadata"
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                        />
+                                    )}
                                 </div>
                             </Link>
 
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 space-y-1">
                                 <Link href={`/watch/${videoId}`}>
-                                    <h3 className="font-medium text-sm line-clamp-2 group-hover:text-blue-600 mb-1">
-                                        {videoObj?.videotitle || "Untitled Video"}
+                                    <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 text-gray-900 dark:text-gray-100">
+                                        {videoObj.videotitle || "Untitled Video"}
                                     </h3>
                                 </Link>
-                                <p className="text-sm text-gray-600">
-                                    {videoObj?.videochanel || "Unknown Channel"}
+                                <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                                    {videoObj.videochanel || "Unknown Channel"}
                                 </p>
-                                <p className="text-sm text-gray-600">
-                                    {(videoObj?.views || 0).toLocaleString()} views •{" "}
-                                    {videoObj?.createdAt ? formatDistanceToNow(new Date(videoObj.createdAt)) : ""} ago
+                                <p className="text-xs text-gray-500">
+                                    {(videoObj.views || 0).toLocaleString()} views •{" "}
+                                    {videoObj.createdAt ? formatDistanceToNow(new Date(videoObj.createdAt)) : ""} ago
                                 </p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-[11px] text-gray-400 mt-1">
                                     Liked {formatDistanceToNow(new Date(item.createdAt))} ago
                                 </p>
                             </div>
 
                             <DropdownMenu>
-                                <DropdownMenuTrigger className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <DropdownMenuTrigger className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer outline-none">
                                     <MoreVertical className="w-4 h-4" />
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                                <DropdownMenuContent align="end" className="text-xs">
                                     <DropdownMenuItem
                                         onClick={() => handleUnlikeVideo(videoId, item._id)}
+                                        className="flex items-center gap-2 text-red-600 dark:text-red-400 cursor-pointer"
                                     >
-                                        <X className="w-4 h-4 mr-2" />
+                                        <X className="w-4 h-4" />
                                         Remove from liked videos
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>

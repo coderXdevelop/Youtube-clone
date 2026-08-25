@@ -10,80 +10,74 @@ import { useParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 const WatchPage = () => {
-  const params = useParams();
-  const id = params?.id as string;
-  const [videos, setvideo] = useState<Video | null>(null);
-  const [video, setvide] = useState<Video[]>([]);
-  const [loading, setloading] = useState(true);
-  useEffect(() => {
-    const fetchvideo = async () => {
-      if (!id || typeof id !== "string") return;
-      try {
-        const res = await axiosInstance.get("/api/video/getall");
-        const matchingVideos = res.data?.filter((vid: Video) => vid._id === id);
-        setvideo(matchingVideos ? matchingVideos[0] : null);
-        setvide(res.data || []);
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setloading(false);
-      }
-    };
-    fetchvideo();
-  }, [id]);
-  // const relatedVideos = [
-  //   {
-  //     _id: "1",
-  //     videotitle: "Amazing Nature Documentary",
-  //     filename: "nature-doc.mp4",
-  //     filetype: "video/mp4",
-  //     filepath: "/videos/nature-doc.mp4",
-  //     filesize: "500MB",
-  //     videochanel: "Nature Channel",
-  //     Like: 1250,
-  //     Dislike: 50,
-  //     views: 45000,
-  //     uploader: "nature_lover",
-  //     createdAt: new Date().toISOString(),
-  //   },
-  //   {
-  //     _id: "2",
-  //     videotitle: "Cooking Tutorial: Perfect Pasta",
-  //     filename: "pasta-tutorial.mp4",
-  //     filetype: "video/mp4",
-  //     filepath: "/videos/pasta-tutorial.mp4",
-  //     filesize: "300MB",
-  //     videochanel: "Chef's Kitchen",
-  //     Like: 890,
-  //     Dislike: 20,
-  //     views: 23000,
-  //     uploader: "chef_master",
-  //     createdAt: new Date(Date.now() - 86400000).toISOString(),
-  //   },
-  // ];
-  if (loading) {
-    return <div>Loading..</div>;
-  }
-  
-  if (!videos) {
-    return <div>Video not found</div>;
-  }
-  return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <Videopplayer video={videos} />
-            <VideoInfo video={videos} />
-            <Comments videoId={id} />
-          </div>
-          <div className="space-y-4">
-            <RelatedVideos videos={video} />
-          </div>
+    const params = useParams();
+    const id = params?.id as string;
+    const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+    const [allVideos, setAllVideos] = useState<Video[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let ignore = false;
+        if (!id || typeof id !== "string") return;
+
+        axiosInstance
+            .get("/api/video/getall")
+            .then((res) => {
+                if (!ignore && Array.isArray(res.data)) {
+                    const matchingVideos = res.data.filter((vid: Video) => vid._id === id);
+                    setCurrentVideo(matchingVideos.length > 0 ? matchingVideos[0] : null);
+                    setAllVideos(res.data);
+                }
+            })
+            .catch((error) => {
+                console.error("Error fetching watch video:", error);
+            })
+            .finally(() => {
+                if (!ignore) setLoading(false);
+            });
+
+        return () => {
+            ignore = true;
+        };
+    }, [id]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950 text-sm text-gray-500">
+                Loading video...
+            </div>
+        );
+    }
+
+    if (!currentVideo) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950 text-sm text-gray-600">
+                Video not found
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-white dark:bg-zinc-950">
+            <div className="max-w-7xl mx-auto p-4 md:p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-4">
+                        <Videopplayer video={currentVideo} />
+                        <VideoInfo video={currentVideo} />
+                        <Comments videoId={id} />
+                    </div>
+                    <div className="space-y-4">
+                        <RelatedVideos
+                            videos={allVideos}
+                            currentVideoId={id}
+                            currentCategory={currentVideo.category}
+                            currentChannel={currentVideo.videochanel}
+                        />
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default WatchPage;
