@@ -15,9 +15,15 @@ connectToDB();
 const app = express();
 const port = process.env.PORT || 5000;
 
-const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+const frontendUrl = process.env.FRONTEND_URI || process.env.FRONTEND_URL || process.env.CLIENT_URL || "http://localhost:3000";
+const allowedOrigins = Array.from(new Set([
+    ...frontendUrl.split(",").map((url) => url.trim()).filter(Boolean),
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]));
+
 app.use(cors({
-    origin: [clientUrl, "http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: allowedOrigins,
     credentials: true
 }));
 app.use(express.json());
