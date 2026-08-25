@@ -18,6 +18,7 @@ export const login = async (req, res) => {
         return res.status(500).json({ message: "Something went wrong" });
     }
 };
+
 export const updateprofile = async (req, res) => {
     const { id: _id } = req.params;
     const { channelname, description } = req.body;
@@ -38,6 +39,23 @@ export const updateprofile = async (req, res) => {
         return res.status(201).json(updatedata);
     } catch (error) {
         console.error(error);
+        return res.status(500).json({ message: "Something went wrong" });
+    }
+};
+
+export const getuserprofile = async (req, res) => {
+    const { id: _id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(_id)) {
+        return res.status(404).json({ message: "Invalid user ID" });
+    }
+    try {
+        const userDoc = await users.findById(_id).select("-__v");
+        if (!userDoc) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        return res.status(200).json(userDoc);
+    } catch (error) {
+        console.error("getuserprofile error:", error);
         return res.status(500).json({ message: "Something went wrong" });
     }
 };

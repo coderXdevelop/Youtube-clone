@@ -13,9 +13,10 @@ import { AxiosProgressEvent } from "axios";
 interface VideoUploaderProps {
   channelId?: string;
   channelName?: string;
+  onUploadSuccess?: () => void;
 }
 
-const VideoUploader = ({ channelId, channelName }: VideoUploaderProps) => {
+const VideoUploader = ({ channelId, channelName, onUploadSuccess }: VideoUploaderProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -85,6 +86,9 @@ const VideoUploader = ({ channelId, channelName }: VideoUploaderProps) => {
       });
       toast.success("Upload successfully");
       resetForm();
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
     } catch (error) {
       console.error("Error uploading video:", error);
       toast.error("There was an error uploading your video. Please try again.");
