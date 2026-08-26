@@ -26,6 +26,8 @@ import axios from "axios";
 
 interface CommentsProps {
     videoId: string;
+    videoOwnerId?: string;
+    videoChannelName?: string;
 }
 
 const LANGUAGES = [
@@ -43,8 +45,17 @@ const LANGUAGES = [
     { code: "it", name: "Italian (Italiano)" },
 ];
 
-const Comments = ({ videoId }: CommentsProps) => {
+const Comments = ({ videoId, videoOwnerId, videoChannelName }: CommentsProps) => {
     const { user } = useUser();
+
+    // Check if the current logged-in user is the channel owner of this video
+    const isChannelOwner = Boolean(
+        user && (
+            (videoOwnerId && (user._id === videoOwnerId || user.email === videoOwnerId)) ||
+            (videoChannelName && user.channelname && user.channelname.trim().toLowerCase() === videoChannelName.trim().toLowerCase()) ||
+            (videoChannelName && user.name && user.name.trim().toLowerCase() === videoChannelName.trim().toLowerCase())
+        )
+    );
 
     const [comments, setComments] = useState<CommentData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -308,17 +319,19 @@ const Comments = ({ videoId }: CommentsProps) => {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Admin Moderation Button */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsAdminOpen(true)}
-                        className="h-8 px-2 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                        title="Open Comment Moderation Hub"
-                    >
-                        <Shield className="w-3.5 h-3.5 mr-1" />
-                        <span>Moderation</span>
-                    </Button>
+                    {/* Channel Owner Moderation Button (Only visible to video owner) */}
+                    {isChannelOwner && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAdminOpen(true)}
+                            className="h-8 px-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 font-medium"
+                            title="Open Channel Moderation Hub"
+                        >
+                            <Shield className="w-3.5 h-3.5 mr-1" />
+                            <span>Moderation</span>
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -465,10 +478,11 @@ const Comments = ({ videoId }: CommentsProps) => {
                 onVerified={handleCaptchaVerified}
             />
 
-            {/* Admin Moderation Dialog */}
+            {/* Channel Moderation Dialog */}
             <AdminModerationDialog
                 isOpen={isAdminOpen}
                 onClose={() => setIsAdminOpen(false)}
+                videoId={videoId}
                 onCommentModerated={reloadComments}
             />
         </div>

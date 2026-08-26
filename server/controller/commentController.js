@@ -1,5 +1,7 @@
 import comment from "../model/comment.js";
 import CommentReport from "../model/commentReport.js";
+import video from "../model/video.js";
+import User from "../model/user.js";
 import mongoose from "mongoose";
 import {
     checkProfanity,
@@ -598,17 +600,74 @@ export const getSupportedLanguages = (req, res) => {
 };
 
 /**
- * ADMIN: Get flagged comments & reports
+ * CHANNEL OWNER: Get flagged comments & reports for a specific video or channel owner's videos
  */
 export const getadminflaggedcomments = async (req, res) => {
     try {
-        const reports = await CommentReport.find({ status: "pending" })
+        const { videoid, userId } = req.query;
+
+        let reportFilter = { status: "pending" };
+        let flaggedFilter = { moderationstatus: "flagged" };
+
+        if (videoid) {
+            if (!mongoose.Types.ObjectId.isValid(videoid)) {
+                return res.status(400).json({ message: "Invalid video ID." });
+            }
+
+            // Verify channel ownership if userId is provided
+            const targetVideo = await video.findById(videoid);
+            if (targetVideo && userId) {
+                const isUploaderMatch = targetVideo.uploader && targetVideo.uploader.toString() === userId.toString();
+                let isChannelMatch = false;
+
+                if (mongoose.Types.ObjectId.isValid(userId)) {
+                    const userDoc = await User.findById(userId);
+                    if (userDoc) {
+                        isChannelMatch = Boolean(
+                            (userDoc.channelname && targetVideo.videochanel && userDoc.channelname.toLowerCase() === targetVideo.videochanel.toLowerCase()) ||
+                            (userDoc.name && targetVideo.videochanel && userDoc.name.toLowerCase() === targetVideo.videochanel.toLowerCase())
+                        );
+                    }
+                }
+
+                if (!isUploaderMatch && !isChannelMatch) {
+                    return res.status(403).json({
+                        message: "Access denied. Only the channel owner can view moderation reports for this video.",
+                    });
+                }
+            }
+
+            reportFilter.videoid = videoid;
+            flaggedFilter.videoid = videoid;
+        } else if (userId) {
+            // Find all videos belonging to this creator/channel
+            let channelConditions = [];
+            channelConditions.push({ uploader: userId });
+
+            if (mongoose.Types.ObjectId.isValid(userId)) {
+                const userDoc = await User.findById(userId);
+                if (userDoc?.channelname) {
+                    channelConditions.push({ videochanel: userDoc.channelname });
+                }
+                if (userDoc?.name) {
+                    channelConditions.push({ videochanel: userDoc.name });
+                }
+            }
+
+            const creatorVideos = await video.find({ $or: channelConditions }).select("_id");
+            const creatorVideoIds = creatorVideos.map((v) => v._id);
+
+            reportFilter.videoid = { $in: creatorVideoIds };
+            flaggedFilter.videoid = { $in: creatorVideoIds };
+        }
+
+        const reports = await CommentReport.find(reportFilter)
             .sort({ createdAt: -1 })
             .populate("commentid")
             .populate("reportedby", "name email image")
             .lean();
 
-        const flaggedComments = await comment.find({ moderationstatus: "flagged" })
+        const flaggedComments = await comment.find(flaggedFilter)
             .sort({ reportcount: -1 })
             .lean();
 
@@ -623,7 +682,7 @@ export const getadminflaggedcomments = async (req, res) => {
 };
 
 /**
- * ADMIN: Review, dismiss, or action flagged comment
+ * CHANNEL OWNER: Review, dismiss, or action flagged comment
  */
 export const reviewcomment = async (req, res) => {
     const { id: _id } = req.params;
@@ -634,6 +693,36 @@ export const reviewcomment = async (req, res) => {
     }
 
     try {
+        const targetComment = await comment.findById(_id);
+        if (!targetComment) {
+            return res.status(404).json({ message: "Comment not found." });
+        }
+
+        // Verify that the reviewer is the owner of the video where the comment is posted
+        if (reviewerid) {
+            const targetVideo = await video.findById(targetComment.videoid);
+            if (targetVideo) {
+                const isUploaderMatch = targetVideo.uploader && targetVideo.uploader.toString() === reviewerid.toString();
+                let isChannelMatch = false;
+
+                if (mongoose.Types.ObjectId.isValid(reviewerid)) {
+                    const userDoc = await User.findById(reviewerid);
+                    if (userDoc) {
+                        isChannelMatch = Boolean(
+                            (userDoc.channelname && targetVideo.videochanel && userDoc.channelname.toLowerCase() === targetVideo.videochanel.toLowerCase()) ||
+                            (userDoc.name && targetVideo.videochanel && userDoc.name.toLowerCase() === targetVideo.videochanel.toLowerCase())
+                        );
+                    }
+                }
+
+                if (!isUploaderMatch && !isChannelMatch) {
+                    return res.status(403).json({
+                        message: "Access denied. Only the channel owner can moderate comments on this video.",
+                    });
+                }
+            }
+        }
+
         if (action === "dismiss" || action === "approve") {
             await comment.findByIdAndUpdate(_id, {
                 $set: { moderationstatus: "approved", reportcount: 0 },

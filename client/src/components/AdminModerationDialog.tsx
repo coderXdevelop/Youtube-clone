@@ -15,6 +15,7 @@ import { formatDistanceToNow } from "date-fns";
 interface AdminModerationDialogProps {
     isOpen: boolean;
     onClose: () => void;
+    videoId?: string;
     onCommentModerated?: () => void;
 }
 
@@ -39,6 +40,7 @@ interface ReportItem {
 const AdminModerationDialog = ({
     isOpen,
     onClose,
+    videoId,
     onCommentModerated,
 }: AdminModerationDialogProps) => {
     const { user } = useUser();
@@ -48,10 +50,15 @@ const AdminModerationDialog = ({
     const [feedback, setFeedback] = useState<string | null>(null);
 
     const fetchFlagged = async () => {
+        if (!user?._id) return;
         setLoading(true);
         setFeedback(null);
         try {
-            const res = await axiosInstance.get("/api/comment/admin/flagged");
+            const params = new URLSearchParams();
+            if (videoId) params.append("videoid", videoId);
+            if (user?._id) params.append("userId", user._id);
+
+            const res = await axiosInstance.get(`/api/comment/admin/flagged?${params.toString()}`);
             if (res.data?.reports) {
                 setReports(res.data.reports);
             }
@@ -64,8 +71,12 @@ const AdminModerationDialog = ({
 
     useEffect(() => {
         let ignore = false;
-        if (isOpen) {
-            axiosInstance.get("/api/comment/admin/flagged")
+        if (isOpen && user?._id) {
+            const params = new URLSearchParams();
+            if (videoId) params.append("videoid", videoId);
+            if (user?._id) params.append("userId", user._id);
+
+            axiosInstance.get(`/api/comment/admin/flagged?${params.toString()}`)
                 .then((res) => {
                     if (!ignore && res.data?.reports) {
                         setReports(res.data.reports);
@@ -81,7 +92,7 @@ const AdminModerationDialog = ({
         return () => {
             ignore = true;
         };
-    }, [isOpen]);
+    }, [isOpen, videoId, user?._id]);
 
     const handleAction = async (
         commentId: string,
@@ -94,6 +105,7 @@ const AdminModerationDialog = ({
                 action,
                 reportid: reportId,
                 reviewerid: user?._id,
+                videoid: videoId,
             });
             setReports((prev) => prev.filter((r) => r._id !== reportId));
             setFeedback(`Report marked as ${action}ed.`);
@@ -113,7 +125,7 @@ const AdminModerationDialog = ({
                         <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
                             <Shield className="w-5 h-5" />
                             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                Comment Moderation Hub
+                                Channel Moderation Hub
                             </DialogTitle>
                         </div>
                         <Button

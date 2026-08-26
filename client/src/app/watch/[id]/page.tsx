@@ -64,7 +64,11 @@ const WatchPage = () => {
                     <div className="lg:col-span-2 space-y-4">
                         <Videopplayer video={currentVideo} />
                         <VideoInfo video={currentVideo} />
-                        <Comments videoId={id} />
+                        <Comments
+                            videoId={id}
+                            videoOwnerId={currentVideo?.uploader}
+                            videoChannelName={currentVideo?.videochanel}
+                        />
                     </div>
                     <div className="space-y-4">
                         <RelatedVideos
