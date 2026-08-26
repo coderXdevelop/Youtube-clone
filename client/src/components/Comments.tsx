@@ -213,12 +213,17 @@ const Comments = ({ videoId, videoOwnerId, videoChannelName }: CommentsProps) =>
         setComments((prev) => prev.map((c) => (c._id === updated._id ? { ...c, ...updated } : c)));
     };
 
-    // Delete or soft-delete comment in state
+    // Delete or soft-delete comment in state (preserving replies if any exist)
     const handleCommentDeleted = (commentId: string, softDeleted?: boolean) => {
-        if (softDeleted) {
+        // Check if there are any child replies in state referencing this commentId
+        const hasReplies = comments.some(
+            (c) => c.parentcommentid && c.parentcommentid.toString() === commentId.toString()
+        );
+
+        if (softDeleted || hasReplies) {
             setComments((prev) =>
                 prev.map((c) =>
-                    c._id === commentId
+                    c._id.toString() === commentId.toString()
                         ? {
                               ...c,
                               isdeleted: true,
@@ -229,7 +234,7 @@ const Comments = ({ videoId, videoOwnerId, videoChannelName }: CommentsProps) =>
                 )
             );
         } else {
-            setComments((prev) => prev.filter((c) => c._id !== commentId));
+            setComments((prev) => prev.filter((c) => c._id.toString() !== commentId.toString()));
         }
     };
 
@@ -245,8 +250,12 @@ const Comments = ({ videoId, videoOwnerId, videoChannelName }: CommentsProps) =>
         ]);
     };
 
-    // Filter top-level comments (those without parentcommentid)
-    const topLevelComments = comments.filter((c) => !c.parentcommentid);
+    // Filter top-level comments: comments without parentcommentid OR whose parent comment was deleted/not found
+    const topLevelComments = comments.filter((c) => {
+        if (!c.parentcommentid) return true;
+        const parentExists = comments.some((p) => p._id.toString() === c.parentcommentid?.toString());
+        return !parentExists;
+    });
 
     const sortLabels: Record<string, string> = {
         newest: "Newest first",

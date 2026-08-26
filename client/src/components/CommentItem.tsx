@@ -129,8 +129,15 @@ const CommentItem = ({
 
     // Filter child replies for this comment
     const childReplies = allComments.filter(
-        (c) => c.parentcommentid?.toString() === comment._id?.toString()
+        (c) => c.parentcommentid && c.parentcommentid.toString() === comment._id?.toString()
     );
+
+    // If comment is deleted and has replies, automatically keep replies expanded
+    useEffect(() => {
+        if (comment.isdeleted && childReplies.length > 0) {
+            setShowReplies(true);
+        }
+    }, [comment.isdeleted, childReplies.length]);
 
     // Format mentions in comment body
     const renderCommentBodyWithMentions = (text: string) => {
@@ -292,10 +299,15 @@ const CommentItem = ({
     const handleDelete = async () => {
         if (!confirm("Are you sure you want to delete this comment?")) return;
         try {
+            const hasReplies = childReplies.length > 0;
             const res = await axiosInstance.delete(`/api/comment/deletecomment/${comment._id}`, {
                 data: { userid: user?._id },
             });
-            onCommentDeleted(comment._id, res.data?.softDeleted);
+            const isSoft = res.data?.softDeleted ?? hasReplies;
+            onCommentDeleted(comment._id, isSoft);
+            if (isSoft || hasReplies) {
+                setShowReplies(true);
+            }
         } catch {
             console.error("Delete error occurred");
         }
@@ -343,15 +355,15 @@ const CommentItem = ({
             <Avatar className="w-9 h-9 shrink-0 ring-1 ring-black/5 dark:ring-white/10">
                 <AvatarImage src={comment.userimage || "/placeholder.svg"} />
                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold">
-                    {comment.usercommented?.[0]?.toUpperCase() || "U"}
+                    {comment.isdeleted ? "—" : (comment.usercommented?.[0]?.toUpperCase() || "U")}
                 </AvatarFallback>
             </Avatar>
 
             <div className="flex-1 min-w-0 space-y-1">
                 {/* User Header Metadata */}
                 <div className="flex items-center gap-2 flex-wrap text-xs">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100 tracking-tight">
-                        @{comment.usercommented}
+                    <span className={`font-semibold tracking-tight ${comment.isdeleted ? "text-gray-400 dark:text-gray-500 italic" : "text-gray-900 dark:text-gray-100"}`}>
+                        {comment.isdeleted ? "[deleted]" : `@${comment.usercommented}`}
                     </span>
 
                     {/* Location Badge */}

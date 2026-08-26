@@ -281,13 +281,15 @@ export const deletecomment = async (req, res) => {
             return res.status(403).json({ message: "You are not authorized to delete this comment." });
         }
 
-        // Check if comment has replies
+        // Check if comment has replies (active or soft-deleted)
         const replyCount = await comment.countDocuments({
-            parentcommentid: _id,
-            isdeleted: false,
+            $or: [
+                { parentcommentid: _id },
+                { parentcommentid: _id.toString() },
+            ],
         });
 
-        if (replyCount > 0 || existingComment.replycount > 0) {
+        if (replyCount > 0 || (existingComment.replycount && existingComment.replycount > 0)) {
             // Soft delete to preserve conversation tree
             await comment.findByIdAndUpdate(_id, {
                 $set: {
@@ -742,7 +744,25 @@ export const reviewcomment = async (req, res) => {
                 });
             }
         } else if (action === "delete") {
-            await comment.findByIdAndDelete(_id);
+            const replyCount = await comment.countDocuments({
+                $or: [
+                    { parentcommentid: _id },
+                    { parentcommentid: _id.toString() },
+                ],
+            });
+
+            if (replyCount > 0 || (targetComment.replycount && targetComment.replycount > 0)) {
+                await comment.findByIdAndUpdate(_id, {
+                    $set: {
+                        isdeleted: true,
+                        commentbody: "[This comment has been removed by the moderator]",
+                        isedited: false,
+                    },
+                });
+            } else {
+                await comment.findByIdAndDelete(_id);
+            }
+
             await CommentReport.updateMany(
                 { commentid: _id },
                 { $set: { status: "actioned", reviewedby: reviewerid, reviewedat: new Date() } }
