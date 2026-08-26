@@ -44,13 +44,17 @@ const commentReportSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ["pending", "reviewed", "dismissed", "actioned"],
+            enum: ["pending", "reviewed", "dismissed", "actioned", "comment_deleted"],
             default: "pending",
         },
         reviewedby: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             default: null,
+        },
+        reviewedbyname: {
+            type: String,
+            default: "",
         },
         reviewedat: {
             type: Date,

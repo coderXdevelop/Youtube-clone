@@ -1,5 +1,6 @@
 import comment from "../model/comment.js";
 import CommentReport from "../model/commentReport.js";
+import CommentAudit from "../model/commentAudit.js";
 import video from "../model/video.js";
 import User from "../model/user.js";
 import mongoose from "mongoose";
@@ -113,6 +114,21 @@ export const postcomment = async (req, res) => {
         // Record for rate limiting & spam prevention
         recordRateLimitHit(userid);
         recordCommentForSpam(userid, trimmedBody);
+
+        // Record permanent audit log
+        try {
+            await CommentAudit.create({
+                commentid: savedComment._id,
+                videoid,
+                userid,
+                username: usercommented || "Anonymous",
+                action: "created",
+                newbody: trimmedBody,
+                details: parentcommentid ? "Posted a reply" : "Posted a new comment",
+            });
+        } catch (auditErr) {
+            console.warn("Audit log creation error:", auditErr.message);
+        }
 
         return res.status(200).json({
             comment: true,
@@ -252,6 +268,22 @@ export const editcomment = async (req, res) => {
             { new: true }
         );
 
+        // Record permanent edit audit log
+        try {
+            await CommentAudit.create({
+                commentid: _id,
+                videoid: existingComment.videoid,
+                userid: userid || existingComment.userid,
+                username: existingComment.usercommented,
+                action: "edited",
+                previousbody: existingComment.commentbody,
+                newbody: trimmedBody,
+                details: `Revision #${(existingComment.version || 1) + 1}`,
+            });
+        } catch (auditErr) {
+            console.warn("Edit audit log error:", auditErr.message);
+        }
+
         return res.status(200).json(updatedComment);
     } catch (error) {
         console.error("editcomment error:", error);
@@ -289,15 +321,41 @@ export const deletecomment = async (req, res) => {
             ],
         });
 
-        if (replyCount > 0 || (existingComment.replycount && existingComment.replycount > 0)) {
+        const isSoft = replyCount > 0 || (existingComment.replycount && existingComment.replycount > 0);
+
+        // Record permanent deletion audit log
+        try {
+            await CommentAudit.create({
+                commentid: _id,
+                videoid: existingComment.videoid,
+                userid: userid || existingComment.userid,
+                username: existingComment.usercommented,
+                action: isSoft ? "soft_deleted" : "deleted",
+                previousbody: existingComment.commentbody,
+                details: isSoft ? "Soft-deleted by author to preserve reply thread" : "Permanently deleted by author",
+            });
+        } catch (auditErr) {
+            console.warn("Delete audit log error:", auditErr.message);
+        }
+
+        if (isSoft) {
             // Soft delete to preserve conversation tree
             await comment.findByIdAndUpdate(_id, {
                 $set: {
                     isdeleted: true,
+                    deletedat: new Date(),
+                    deletedby: userid ? userid.toString() : "author",
                     commentbody: "[This comment has been deleted by the author]",
                     isedited: false,
                 },
             });
+
+            // Preserve report logs by updating status rather than deleting
+            await CommentReport.updateMany(
+                { commentid: _id },
+                { $set: { status: "comment_deleted" } }
+            );
+
             return res.status(200).json({ comment: true, softDeleted: true });
         } else {
             // Hard delete
@@ -310,8 +368,11 @@ export const deletecomment = async (req, res) => {
                 });
             }
 
-            // Also clean up any associated report records
-            await CommentReport.deleteMany({ commentid: _id });
+            // Preserve historical report records by marking comment_deleted
+            await CommentReport.updateMany(
+                { commentid: _id },
+                { $set: { status: "comment_deleted" } }
+            );
 
             return res.status(200).json({ comment: true, softDeleted: false });
         }
@@ -477,6 +538,21 @@ export const reportcomment = async (req, res) => {
             status: "pending",
         });
 
+        // Record permanent report audit log
+        try {
+            await CommentAudit.create({
+                commentid: _id,
+                videoid: existingComment.videoid,
+                userid,
+                username: username || "Anonymous",
+                action: "reported",
+                previousbody: existingComment.commentbody,
+                details: `Report reason: ${reason}. Notes: ${details || "None"}`,
+            });
+        } catch (auditErr) {
+            console.warn("Report audit log error:", auditErr.message);
+        }
+
         // Update comment report count and flag if threshold (>=3 reports) reached
         const newReportCount = (existingComment.reportcount || 0) + 1;
         const newStatus = newReportCount >= 3 ? "flagged" : existingComment.moderationstatus;
@@ -522,39 +598,32 @@ export const translatecomment = async (req, res) => {
         if (existingTranslations[targetLang]) {
             return res.status(200).json({
                 translatedText: existingTranslations[targetLang],
-                detectedSourceLang: existingComment.detectedlanguage || "auto",
-                targetLang,
-                cached: true,
+                fromCache: true,
             });
         }
 
-        // Translate via helper
-        const result = await translateText(
-            existingComment.commentbody,
-            targetLang,
-            existingComment.detectedlanguage || "auto"
-        );
+        // Translate using free public endpoint / fallback dictionary
+        const translationResult = await translateText(existingComment.commentbody, targetLang);
 
-        // Cache translation in DB
+        // Cache translation in comment document
         const updateKey = `translations.${targetLang}`;
         await comment.findByIdAndUpdate(_id, {
-            $set: { [updateKey]: result.translatedText },
+            $set: { [updateKey]: translationResult.translatedText },
         });
 
         return res.status(200).json({
-            translatedText: result.translatedText,
-            detectedSourceLang: result.detectedSourceLang,
-            targetLang: result.targetLang,
-            cached: false,
+            translatedText: translationResult.translatedText,
+            detectedSource: translationResult.detectedSource,
+            fromCache: false,
         });
     } catch (error) {
         console.error("translatecomment error:", error);
-        return res.status(500).json({ message: "Translation failed. Please try again." });
+        return res.status(500).json({ message: "Something went wrong translating comment." });
     }
 };
 
 /**
- * GET edit history for a comment
+ * GET comment edit revision history
  */
 export const getcommenthistory = async (req, res) => {
     const { id: _id } = req.params;
@@ -602,13 +671,13 @@ export const getSupportedLanguages = (req, res) => {
 };
 
 /**
- * CHANNEL OWNER: Get flagged comments & reports for a specific video or channel owner's videos
+ * CHANNEL OWNER: Get flagged comments, pending reports, moderation records & audit history
  */
 export const getadminflaggedcomments = async (req, res) => {
     try {
         const { videoid, userId } = req.query;
 
-        let reportFilter = { status: "pending" };
+        let baseFilter = {};
         let flaggedFilter = { moderationstatus: "flagged" };
 
         if (videoid) {
@@ -639,7 +708,7 @@ export const getadminflaggedcomments = async (req, res) => {
                 }
             }
 
-            reportFilter.videoid = videoid;
+            baseFilter.videoid = videoid;
             flaggedFilter.videoid = videoid;
         } else if (userId) {
             // Find all videos belonging to this creator/channel
@@ -659,22 +728,48 @@ export const getadminflaggedcomments = async (req, res) => {
             const creatorVideos = await video.find({ $or: channelConditions }).select("_id");
             const creatorVideoIds = creatorVideos.map((v) => v._id);
 
-            reportFilter.videoid = { $in: creatorVideoIds };
+            baseFilter.videoid = { $in: creatorVideoIds };
             flaggedFilter.videoid = { $in: creatorVideoIds };
         }
 
-        const reports = await CommentReport.find(reportFilter)
+        // 1. Pending user reports awaiting action
+        const pendingReports = await CommentReport.find({
+            ...baseFilter,
+            status: "pending",
+        })
             .sort({ createdAt: -1 })
             .populate("commentid")
             .populate("reportedby", "name email image")
             .lean();
 
+        // 2. Historical moderation records & resolved report logs
+        const moderationRecords = await CommentReport.find({
+            ...baseFilter,
+            status: { $ne: "pending" },
+        })
+            .sort({ reviewedat: -1, createdAt: -1 })
+            .populate("commentid")
+            .populate("reportedby", "name email image")
+            .populate("reviewedby", "name email channelname image")
+            .lean();
+
+        // 3. Immutable Comment Audit Logs (creation, edit, deletion, moderation events)
+        const auditLogs = await CommentAudit.find(baseFilter)
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .populate("userid", "name email image channelname")
+            .lean();
+
+        // 4. Flagged comments list
         const flaggedComments = await comment.find(flaggedFilter)
             .sort({ reportcount: -1 })
             .lean();
 
         return res.status(200).json({
-            reports,
+            reports: pendingReports,
+            pendingReports,
+            moderationRecords,
+            auditLogs,
             flaggedComments,
         });
     } catch (error) {
@@ -700,6 +795,8 @@ export const reviewcomment = async (req, res) => {
             return res.status(404).json({ message: "Comment not found." });
         }
 
+        let reviewerName = "Moderator";
+
         // Verify that the reviewer is the owner of the video where the comment is posted
         if (reviewerid) {
             const targetVideo = await video.findById(targetComment.videoid);
@@ -710,6 +807,7 @@ export const reviewcomment = async (req, res) => {
                 if (mongoose.Types.ObjectId.isValid(reviewerid)) {
                     const userDoc = await User.findById(reviewerid);
                     if (userDoc) {
+                        reviewerName = userDoc.name || userDoc.channelname || "Moderator";
                         isChannelMatch = Boolean(
                             (userDoc.channelname && targetVideo.videochanel && userDoc.channelname.toLowerCase() === targetVideo.videochanel.toLowerCase()) ||
                             (userDoc.name && targetVideo.videochanel && userDoc.name.toLowerCase() === targetVideo.videochanel.toLowerCase())
@@ -731,7 +829,12 @@ export const reviewcomment = async (req, res) => {
             });
             if (reportid) {
                 await CommentReport.findByIdAndUpdate(reportid, {
-                    $set: { status: "dismissed", reviewedby: reviewerid, reviewedat: new Date() },
+                    $set: {
+                        status: "dismissed",
+                        reviewedby: reviewerid,
+                        reviewedbyname: reviewerName,
+                        reviewedat: new Date(),
+                    },
                 });
             }
         } else if (action === "hide") {
@@ -740,7 +843,12 @@ export const reviewcomment = async (req, res) => {
             });
             if (reportid) {
                 await CommentReport.findByIdAndUpdate(reportid, {
-                    $set: { status: "actioned", reviewedby: reviewerid, reviewedat: new Date() },
+                    $set: {
+                        status: "actioned",
+                        reviewedby: reviewerid,
+                        reviewedbyname: reviewerName,
+                        reviewedat: new Date(),
+                    },
                 });
             }
         } else if (action === "delete") {
@@ -755,6 +863,8 @@ export const reviewcomment = async (req, res) => {
                 await comment.findByIdAndUpdate(_id, {
                     $set: {
                         isdeleted: true,
+                        deletedat: new Date(),
+                        deletedby: reviewerid ? reviewerid.toString() : "moderator",
                         commentbody: "[This comment has been removed by the moderator]",
                         isedited: false,
                     },
@@ -765,8 +875,30 @@ export const reviewcomment = async (req, res) => {
 
             await CommentReport.updateMany(
                 { commentid: _id },
-                { $set: { status: "actioned", reviewedby: reviewerid, reviewedat: new Date() } }
+                {
+                    $set: {
+                        status: "actioned",
+                        reviewedby: reviewerid,
+                        reviewedbyname: reviewerName,
+                        reviewedat: new Date(),
+                    },
+                }
             );
+        }
+
+        // Record permanent moderation action in audit log
+        try {
+            await CommentAudit.create({
+                commentid: _id,
+                videoid: targetComment.videoid,
+                userid: reviewerid || targetComment.userid,
+                username: reviewerName,
+                action: "moderation_action",
+                previousbody: targetComment.commentbody,
+                details: `Moderation action taken: "${action}". Report ID: ${reportid || "N/A"}`,
+            });
+        } catch (auditErr) {
+            console.warn("Moderation audit log error:", auditErr.message);
         }
 
         return res.status(200).json({ success: true, message: `Comment ${action}d successfully.` });

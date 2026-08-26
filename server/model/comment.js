@@ -47,6 +47,8 @@ const commentschema = mongoose.Schema(
             },
         ],
         isdeleted: { type: Boolean, default: false },
+        deletedat: { type: Date, default: null },
+        deletedby: { type: String, default: "" },
         reports: [
             {
                 userid: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
