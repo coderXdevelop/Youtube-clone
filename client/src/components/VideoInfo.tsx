@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useUser } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/AxiosInstance";
 import { Video } from "./VideoCard";
+import DownloadQuotaModal from "./DownloadQuotaModal";
 
 interface VideoInfoProps {
   video: Video;
@@ -26,6 +27,16 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const { user } = useUser();
   const [isWatchLater, setIsWatchLater] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadFeedback, setDownloadFeedback] = useState<string | null>(null);
+  const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+  const [quotaData, setQuotaData] = useState<{
+    plan: string;
+    limit: number;
+    usedToday: number;
+    nextResetTime?: string;
+  } | null>(null);
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
   // const user: any = {
   //   id: "1",
@@ -147,6 +158,52 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       }
     }
   };
+  const handleDownload = async () => {
+    if (!user?._id) {
+      alert("Please sign in to download videos.");
+      return;
+    }
+
+    setDownloading(true);
+    setDownloadFeedback(null);
+
+    try {
+      // 1. Authorize download request
+      const res = await axiosInstance.post("/api/download/request", {
+        userId: user._id,
+        videoId: video._id,
+      });
+
+      if (res.data?.success) {
+        setDownloadFeedback(res.data.message || "Download started!");
+        // 2. Trigger browser download
+        const downloadUrl = `${backendUrl}/api/download/file/${video._id}?userId=${user._id}`;
+        window.location.href = downloadUrl;
+      }
+    } catch (err: unknown) {
+      const errorResponse = err && typeof err === "object" && "response" in err
+        ? (err as { response?: { status?: number; data?: { message?: string; plan?: string; limit?: number } } }).response
+        : null;
+
+      if (errorResponse?.status === 429) {
+        // Daily limit reached: Fetch latest quota and display upgrade modal
+        try {
+          const qRes = await axiosInstance.get(`/api/download/quota/${user._id}?videoId=${video._id}`);
+          if (qRes.data) {
+            setQuotaData(qRes.data);
+          }
+        } catch {
+          // fallback quota
+        }
+        setQuotaModalOpen(true);
+      } else {
+        setDownloadFeedback(errorResponse?.data?.message || "Failed to download video.");
+      }
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">{video.videotitle}</h1>
@@ -211,10 +268,12 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="bg-gray-100 rounded-full"
+            className="bg-gray-100 rounded-full text-gray-800 hover:text-indigo-600 dark:hover:text-indigo-400"
+            onClick={handleDownload}
+            disabled={downloading}
           >
-            <Download className="w-5 h-5 mr-2" />
-            Download
+            <Download className={`w-5 h-5 mr-2 ${downloading ? "animate-bounce text-indigo-600" : ""}`} />
+            {downloading ? "Downloading..." : "Download"}
           </Button>
           <Button
             variant="ghost"
@@ -225,6 +284,18 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           </Button>
         </div>
       </div>
+
+      {downloadFeedback && (
+        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs rounded-xl border border-indigo-200 dark:border-indigo-900 flex items-center justify-between">
+          <span>{downloadFeedback}</span>
+          <button
+            onClick={() => setDownloadFeedback(null)}
+            className="text-xs hover:underline font-medium"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="bg-gray-100 rounded-lg p-4">
         <div className="flex gap-4 text-sm font-medium mb-2">
           <span>{video.views.toLocaleString()} views</span>
@@ -245,6 +316,18 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           {showFullDescription ? "Show less" : "Show more"}
         </Button>
       </div>
+
+      {/* Quota Exceeded Modal */}
+      {quotaData && (
+        <DownloadQuotaModal
+          isOpen={quotaModalOpen}
+          onClose={() => setQuotaModalOpen(false)}
+          plan={quotaData.plan}
+          limit={quotaData.limit}
+          usedToday={quotaData.usedToday}
+          nextResetTime={quotaData.nextResetTime}
+        />
+      )}
     </div>
   );
 };

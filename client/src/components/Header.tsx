@@ -168,6 +168,9 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                                 <DropdownMenuItem >
                                     <Link href="/downloads">Downloads</Link>
                                 </DropdownMenuItem>
+                                <DropdownMenuItem >
+                                    <Link href="/subscriptions">Subscriptions & Plans</Link>
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={logout}>Sign out</DropdownMenuItem>
                             </DropdownMenuContent>

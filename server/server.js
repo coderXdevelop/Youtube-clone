@@ -9,6 +9,8 @@ import commentRoute from "./routes/commentRoute.js";
 import likeRoute from "./routes/likeRoute.js";
 import historyRoute from "./routes/historyRoute.js";
 import watchlaterRoute from "./routes/watchlaterRoute.js";
+import downloadRoute from "./routes/downloadRoute.js";
+import subscriptionRoute from "./routes/subscriptionRoute.js";
 
 connectToDB();
 
@@ -37,6 +39,8 @@ app.use("/api/comment", commentRoute);
 app.use("/api/like", likeRoute);
 app.use("/api/history", historyRoute);
 app.use("/api/watch", watchlaterRoute);
+app.use("/api/download", downloadRoute);
+app.use("/api/subscription", subscriptionRoute);
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
