@@ -169,7 +169,7 @@ export const getSubscriptionPlans = async (req, res) => {
         return res.status(200).json({
             plans: SUBSCRIPTION_PLANS,
             userSubscription,
-            razorpayKeyId: process.env.RAZORPAY_KEY_ID || "rzp_test_ytclone_key",
+            razorpayKeyId: process.env.API_KEY || process.env.RAZORPAY_KEY_ID || "rzp_test_TUHrKogGVX5LaU",
         });
     } catch (error) {
         console.error("getSubscriptionPlans error:", error);
@@ -231,6 +231,8 @@ export const createRazorpayOrder = async (req, res) => {
             },
         });
 
+        const keyId = process.env.API_KEY || process.env.RAZORPAY_KEY_ID || "rzp_test_TUHrKogGVX5LaU";
+
         return res.status(200).json({
             success: true,
             orderId,
@@ -240,7 +242,7 @@ export const createRazorpayOrder = async (req, res) => {
             currency: "INR",
             plan,
             billingcycle,
-            keyId: process.env.RAZORPAY_KEY_ID || "rzp_test_ytclone_key",
+            keyId,
             user: {
                 name: userDoc.name,
                 email: userDoc.email,
