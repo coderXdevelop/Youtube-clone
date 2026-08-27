@@ -6,16 +6,11 @@ import SubscriptionTransaction from "../model/subscriptionTransaction.js";
 // Razorpay Credential Helpers (supports API_KEY, SECREAT, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
 const getRazorpayKeyId = () =>
     process.env.RAZORPAY_KEY_ID ||
-    process.env.API_KEY ||
-    process.env.RAZORPAY_KEY ||
-    "rzp_test_TUQC8aCkBSqxUz";
+    "rzp_test_TUeuM9e49gLaL3";
 
 const getRazorpayKeySecret = () =>
     process.env.RAZORPAY_KEY_SECRET ||
-    process.env.SECREAT ||
-    process.env.SECRET ||
-    process.env.RAZORPAY_SECRET ||
-    "";
+    "0MJa9tcl4VuHYcjZb4eL5Z5x";
 
 // Comprehensive Plan Definitions with features and pricing
 export const SUBSCRIPTION_PLANS = {

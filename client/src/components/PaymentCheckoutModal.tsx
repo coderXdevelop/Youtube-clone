@@ -75,7 +75,7 @@ const PaymentCheckoutModal = ({
 
     // Dynamically load Razorpay standard checkout script
     useEffect(() => {
-        if (!window.Razorpay) {
+        if (typeof window !== "undefined" && !window.Razorpay) {
             const script = document.createElement("script");
             script.src = "https://checkout.razorpay.com/v1/checkout.js";
             script.async = true;
@@ -83,14 +83,13 @@ const PaymentCheckoutModal = ({
         }
     }, []);
 
-    // Reset states when opening
-    useEffect(() => {
-        if (isOpen) {
+    const handleModalClose = () => {
+        if (!loading) {
             setErrorMessage(null);
             setShowOtpScreen(false);
-            setCardHolder(user?.name || "Subscriber");
+            onClose();
         }
-    }, [isOpen, user]);
+    };
 
     /**
      * Launch Real Official Razorpay Standard Checkout Popup
@@ -112,14 +111,35 @@ const PaymentCheckoutModal = ({
             });
 
             if (!orderRes.data?.success) {
-                throw new Error("Failed to initialize payment order.");
+                throw new Error(orderRes.data?.message || "Failed to initialize payment order.");
             }
 
             const { orderId, keyId, amountInPaise } = orderRes.data;
+            const activeKeyId = keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TUeuM9e49gLaL3";
 
             if (typeof window !== "undefined" && window.Razorpay) {
+                interface RazorpaySuccessResponse {
+                    razorpay_payment_id: string;
+                    razorpay_order_id: string;
+                    razorpay_signature: string;
+                }
+
+                interface RazorpayFailureResponse {
+                    error?: {
+                        code?: string;
+                        description?: string;
+                        source?: string;
+                        step?: string;
+                        reason?: string;
+                        metadata?: {
+                            order_id?: string;
+                            payment_id?: string;
+                        };
+                    };
+                }
+
                 const options = {
-                    key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TUQC8aCkBSqxUz",
+                    key: activeKeyId,
                     amount: amountInPaise,
                     currency: "INR",
                     name: "YouTube Clone Premium",
@@ -138,12 +158,13 @@ const PaymentCheckoutModal = ({
                     theme: {
                         color: "#4f46e5",
                     },
-                    handler: async function (response: any) {
+                    handler: async function (response: RazorpaySuccessResponse) {
                         try {
+                            setLoading(true);
                             const verifyRes = await axiosInstance.post("/api/subscription/verify-payment", {
                                 userId: user._id,
                                 orderId: response.razorpay_order_id || orderId,
-                                paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
+                                paymentId: response.razorpay_payment_id,
                                 razorpay_signature: response.razorpay_signature,
                                 signature: response.razorpay_signature,
                                 paymentStatus: "completed",
@@ -153,19 +174,37 @@ const PaymentCheckoutModal = ({
                             if (verifyRes.data?.success && verifyRes.data?.invoice) {
                                 onPaymentSuccess(verifyRes.data.invoice);
                                 onClose();
+                            } else {
+                                setErrorMessage(verifyRes.data?.message || "Signature verification failed on server.");
                             }
-                        } catch {
-                            setErrorMessage("Failed to verify Razorpay payment on server.");
+                        } catch (vErr: unknown) {
+                            const errObj = vErr && typeof vErr === "object" && "response" in vErr
+                                ? (vErr as { response?: { data?: { message?: string } } }).response
+                                : null;
+                            setErrorMessage(errObj?.data?.message || "Failed to verify Razorpay payment on server.");
+                        } finally {
+                            setLoading(false);
                         }
                     },
                     modal: {
                         ondismiss: function () {
                             setLoading(false);
+                            console.log("Razorpay checkout modal dismissed by user.");
                         },
                     },
                 };
 
                 const rzp = new window.Razorpay(options);
+
+                // Handle payment failed event
+                rzp.on("payment.failed", function (response: RazorpayFailureResponse) {
+                    console.error("Razorpay payment failed:", response.error);
+                    setErrorMessage(
+                        response.error?.description || "Payment failed or was declined by the bank."
+                    );
+                    setLoading(false);
+                });
+
                 rzp.open();
                 setLoading(false);
             } else {
@@ -270,7 +309,7 @@ const PaymentCheckoutModal = ({
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && !loading && onClose()}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && handleModalClose()}>
             <DialogContent className="sm:max-w-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl rounded-2xl p-6 overflow-hidden">
                 {/* Header with Razorpay Test Branding */}
                 <DialogHeader className="border-b border-gray-100 dark:border-zinc-800 pb-3">
@@ -328,7 +367,7 @@ const PaymentCheckoutModal = ({
                                     Official Razorpay Popup
                                 </span>
                                 <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-                                    Launches genuine test window with Key ID: <span className="font-mono font-semibold">rzp_test_TUQC8aCkBSqxUz</span>
+                                    Launches genuine test window with Key ID: <span className="font-mono font-semibold">{process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TUeuM9e49gLaL3"}</span>
                                 </p>
                             </div>
                             <Button

@@ -1,0 +1,10 @@
+import express from "express";
+import { createOrder, verifyPayment } from "../controller/paymentController.js";
+
+const router = express.Router();
+
+// Routes for Razorpay Standard Checkout
+router.post("/create-order", createOrder);
+router.post("/verify-payment", verifyPayment);
+
+export default router;

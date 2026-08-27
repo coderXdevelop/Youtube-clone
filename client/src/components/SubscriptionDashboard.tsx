@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     Crown,
     Check,
@@ -14,14 +14,13 @@ import {
     Zap,
     Download,
     Eye,
-    AlertCircle,
     CheckCircle2,
     RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import PaymentCheckoutModal from "./PaymentCheckoutModal";
 import InvoiceReceiptModal, { InvoiceData } from "./InvoiceReceiptModal";
 
@@ -84,7 +83,7 @@ export default function SubscriptionDashboard() {
     const [currentInvoice, setCurrentInvoice] = useState<InvoiceData | null>(null);
     const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-    const loadSubscriptionData = async () => {
+    const loadSubscriptionData = useCallback(async () => {
         setLoading(true);
         try {
             const params = user?._id ? `?userId=${user._id}` : "";
@@ -108,11 +107,11 @@ export default function SubscriptionDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user?._id]);
 
     useEffect(() => {
         loadSubscriptionData();
-    }, [user?._id]);
+    }, [loadSubscriptionData]);
 
     const handleSelectPlan = (planName: string) => {
         if (!user?._id) {
