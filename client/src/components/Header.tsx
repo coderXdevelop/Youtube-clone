@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu, Mic, Search, User, VideoIcon } from "lucide-react";
+import { Bell, Menu, Mic, Search, User, VideoIcon, ShieldCheck, Sun, Moon } from "lucide-react";
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import Link from "next/link";
@@ -26,7 +26,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     const { user, logout, handlegooglesignin } = useUser();
 
-    const { theme } = useEnvironment();
+    const { theme, setThemePreference } = useEnvironment();
     const isLight = theme === "light";
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -168,11 +168,33 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                                 <DropdownMenuItem >
                                     <Link href="/downloads">Downloads</Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem >
-                                    <Link href="/subscriptions">Subscriptions & Plans</Link>
+                                <DropdownMenuItem>
+                                    <Link href="/subscriptions" className="flex items-center gap-2 w-full">
+                                        Subscriptions & Plans
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <Link href="/security" className="flex items-center gap-2 w-full font-medium text-indigo-600 dark:text-indigo-400">
+                                        <ShieldCheck className="w-4 h-4" />
+                                        Security & Sessions
+                                    </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={logout}>Sign out</DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => setThemePreference(theme === "dark" ? "light" : "dark", user?._id)}
+                                    className="cursor-pointer"
+                                >
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="flex items-center gap-2">
+                                            {theme === "dark" ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-purple-500" />}
+                                            Theme: <span className="capitalize font-semibold">{theme}</span>
+                                        </span>
+                                    </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 dark:text-red-400">
+                                    Sign out
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </>

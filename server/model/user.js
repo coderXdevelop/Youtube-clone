@@ -26,6 +26,21 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    // Theme Preference: "auto" (IST time based), "light", or "dark"
+    themepreference: {
+        type: String,
+        enum: ["auto", "light", "dark"],
+        default: "auto"
+    },
+    lastlogintheme: {
+        type: String,
+        default: "dark"
+    },
+    lastloginat: {
+        type: Date,
+        default: Date.now
+    },
+    // Subscription Information
     subscriptionplan: {
         type: String,
         enum: ["Free", "Bronze", "Silver", "Gold"],
@@ -53,14 +68,27 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    // Registered / Trusted Devices for Security & OTP verification
     registereddevices: [
         {
-            deviceid: { type: String },
+            deviceid: { type: String, required: true },
             devicename: { type: String, default: "Default Device" },
-            registeredat: { type: Date, default: Date.now }
+            browser: { type: String, default: "Unknown Browser" },
+            browserversion: { type: String, default: "" },
+            os: { type: String, default: "Unknown OS" },
+            devicetype: { type: String, default: "Desktop" },
+            devicemodel: { type: String, default: "" },
+            ipaddress: { type: String, default: "" },
+            city: { type: String, default: "" },
+            state: { type: String, default: "" },
+            country: { type: String, default: "" },
+            location: { type: String, default: "" },
+            trustedat: { type: Date, default: Date.now },
+            expiresat: { type: Date, default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }, // 30 days
+            lastactive: { type: Date, default: Date.now }
         }
     ]
-})
+});
 
 const User = mongoose.model("User", userSchema);
 

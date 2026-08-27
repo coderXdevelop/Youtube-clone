@@ -108,6 +108,48 @@ export default function CheckoutPage() {
                         email: user?.email || "user@example.com",
                         contact: "9999999999",
                     },
+                    method: {
+                        netbanking: true,
+                        card: true,
+                        upi: true,
+                        wallet: true,
+                        paylater: true,
+                    },
+                    config: {
+                        display: {
+                            blocks: {
+                                upi: {
+                                    name: "Pay using UPI / QR",
+                                    instruments: [
+                                        {
+                                            method: "upi",
+                                        },
+                                    ],
+                                },
+                                other: {
+                                    name: "Other Payment Modes",
+                                    instruments: [
+                                        {
+                                            method: "card",
+                                        },
+                                        {
+                                            method: "netbanking",
+                                        },
+                                        {
+                                            method: "wallet",
+                                        },
+                                        {
+                                            method: "paylater",
+                                        },
+                                    ],
+                                },
+                            },
+                            sequence: ["block.upi", "block.other"],
+                            preferences: {
+                                show_default_blocks: true,
+                            },
+                        },
+                    },
                     theme: {
                         color: "#6366f1",
                     },
