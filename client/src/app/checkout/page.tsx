@@ -17,12 +17,6 @@ import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 
-// Declare Razorpay window object for TypeScript
-declare global {
-    interface Window {
-        Razorpay?: any;
-    }
-}
 
 interface VerificationSuccessData {
     order_id: string;

@@ -12,9 +12,7 @@ import { Button } from "./ui/button";
 import {
     ShieldCheck,
     Lock,
-    Sparkles,
     AlertCircle,
-    CheckCircle2,
     RefreshCw,
     ArrowRight,
     Crown,
@@ -32,13 +30,6 @@ interface PaymentCheckoutModalProps {
     billingcycle: string;
     amount: number;
     onPaymentSuccess: (invoice: InvoiceData) => void;
-}
-
-// Declare Razorpay window object for TypeScript
-declare global {
-    interface Window {
-        Razorpay?: any;
-    }
 }
 
 const PaymentCheckoutModal = ({
