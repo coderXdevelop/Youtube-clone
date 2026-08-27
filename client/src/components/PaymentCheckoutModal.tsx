@@ -119,7 +119,7 @@ const PaymentCheckoutModal = ({
 
             if (typeof window !== "undefined" && window.Razorpay) {
                 const options = {
-                    key: keyId || "rzp_test_TUHrKogGVX5LaU",
+                    key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TUQC8aCkBSqxUz",
                     amount: amountInPaise,
                     currency: "INR",
                     name: "YouTube Clone Premium",
@@ -144,6 +144,8 @@ const PaymentCheckoutModal = ({
                                 userId: user._id,
                                 orderId: response.razorpay_order_id || orderId,
                                 paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
+                                razorpay_signature: response.razorpay_signature,
+                                signature: response.razorpay_signature,
                                 paymentStatus: "completed",
                                 paymentMethod: "Razorpay Standard Checkout",
                             });
@@ -326,7 +328,7 @@ const PaymentCheckoutModal = ({
                                     Official Razorpay Popup
                                 </span>
                                 <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-                                    Launches genuine test window with Key ID: <span className="font-mono font-semibold">rzp_test_TUHrKogGVX5LaU</span>
+                                    Launches genuine test window with Key ID: <span className="font-mono font-semibold">rzp_test_TUQC8aCkBSqxUz</span>
                                 </p>
                             </div>
                             <Button

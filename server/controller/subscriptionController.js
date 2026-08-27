@@ -1,6 +1,21 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
 import User from "../model/user.js";
 import SubscriptionTransaction from "../model/subscriptionTransaction.js";
+
+// Razorpay Credential Helpers (supports API_KEY, SECREAT, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+const getRazorpayKeyId = () =>
+    process.env.RAZORPAY_KEY_ID ||
+    process.env.API_KEY ||
+    process.env.RAZORPAY_KEY ||
+    "rzp_test_TUQC8aCkBSqxUz";
+
+const getRazorpayKeySecret = () =>
+    process.env.RAZORPAY_KEY_SECRET ||
+    process.env.SECREAT ||
+    process.env.SECRET ||
+    process.env.RAZORPAY_SECRET ||
+    "";
 
 // Comprehensive Plan Definitions with features and pricing
 export const SUBSCRIPTION_PLANS = {
@@ -169,7 +184,7 @@ export const getSubscriptionPlans = async (req, res) => {
         return res.status(200).json({
             plans: SUBSCRIPTION_PLANS,
             userSubscription,
-            razorpayKeyId: process.env.API_KEY || process.env.RAZORPAY_KEY_ID || "rzp_test_TUHrKogGVX5LaU",
+            razorpayKeyId: getRazorpayKeyId(),
         });
     } catch (error) {
         console.error("getSubscriptionPlans error:", error);
@@ -207,9 +222,50 @@ export const createRazorpayOrder = async (req, res) => {
 
         const timestamp = Date.now();
         const randomNum = Math.floor(100000 + Math.random() * 900000);
-        const orderId = `order_rzp_${timestamp}_${randomNum}`;
         const invoiceNumber = `INV-${new Date().getFullYear()}-${randomNum}`;
         const subscriptionEnd = computeExpiryDate(billingcycle);
+        const amountInPaise = Math.round(amount * 100);
+
+        const keyId = getRazorpayKeyId();
+        const keySecret = getRazorpayKeySecret();
+
+        let razorpayOrderId = null;
+        if (keyId && keySecret) {
+            try {
+                const authHeader = "Basic " + Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+                const rzpResponse = await fetch("https://api.razorpay.com/v1/orders", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": authHeader,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        amount: amountInPaise,
+                        currency: "INR",
+                        receipt: invoiceNumber,
+                        notes: {
+                            userId: String(userId),
+                            plan,
+                            billingcycle,
+                        },
+                    }),
+                });
+
+                if (rzpResponse.ok) {
+                    const rzpData = await rzpResponse.json();
+                    if (rzpData?.id) {
+                        razorpayOrderId = rzpData.id;
+                    }
+                } else {
+                    const errText = await rzpResponse.text();
+                    console.warn("Razorpay API order creation warning:", errText);
+                }
+            } catch (rzpErr) {
+                console.warn("Razorpay order API connection warning:", rzpErr.message);
+            }
+        }
+
+        const orderId = razorpayOrderId || `order_rzp_${timestamp}_${randomNum}`;
 
         // Store initial transaction log in DB
         const transaction = await SubscriptionTransaction.create({
@@ -231,14 +287,12 @@ export const createRazorpayOrder = async (req, res) => {
             },
         });
 
-        const keyId = process.env.API_KEY || process.env.RAZORPAY_KEY_ID || "rzp_test_TUHrKogGVX5LaU";
-
         return res.status(200).json({
             success: true,
             orderId,
             invoiceNumber,
             amount,
-            amountInPaise: amount * 100,
+            amountInPaise,
             currency: "INR",
             plan,
             billingcycle,
@@ -263,6 +317,8 @@ export const verifySubscriptionPayment = async (req, res) => {
         userId,
         orderId,
         paymentId,
+        signature,
+        razorpay_signature,
         paymentStatus = "completed",
         paymentMethod = "Razorpay Test Gateway",
     } = req.body;
@@ -286,6 +342,24 @@ export const verifySubscriptionPayment = async (req, res) => {
                 success: false,
                 message: `Payment was ${paymentStatus}. No charges were processed.`,
             });
+        }
+
+        // Validate cryptographic Razorpay Signature if signature was passed from checkout
+        const sigToVerify = razorpay_signature || signature;
+        const keySecret = getRazorpayKeySecret();
+        if (sigToVerify && keySecret && paymentId) {
+            const expectedSignature = crypto
+                .createHmac("sha256", keySecret)
+                .update(`${orderId}|${paymentId}`)
+                .digest("hex");
+
+            if (expectedSignature !== sigToVerify) {
+                console.warn("Razorpay signature mismatch:", { expectedSignature, sigToVerify });
+                return res.status(400).json({
+                    success: false,
+                    message: "Payment signature verification failed. Unauthorized transaction.",
+                });
+            }
         }
 
         const generatedPaymentId = paymentId || `pay_rzp_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
