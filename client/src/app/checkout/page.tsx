@@ -84,8 +84,7 @@ export default function CheckoutPage() {
             const orderId = orderRes.data.order_id || orderRes.data.id;
             const keyId =
                 orderRes.data.key_id ||
-                process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-                "rzp_test_TUeuM9e49gLaL3";
+                process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
             // STEP 2: FRONTEND - Launch Razorpay Standard Checkout
             if (typeof window !== "undefined" && window.Razorpay) {
@@ -321,7 +320,7 @@ export default function CheckoutPage() {
                                 Standard Razorpay Integration Mode
                             </span>
                             <p className="text-indigo-800/80 dark:text-indigo-300/80 font-mono text-[11px]">
-                                Key ID: {process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TUeuM9e49gLaL3"}
+                                Key ID: {process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "Configured via environment"}
                             </p>
                         </div>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">

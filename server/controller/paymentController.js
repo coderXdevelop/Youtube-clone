@@ -4,17 +4,10 @@ import Razorpay from "razorpay";
 // Helper to get Razorpay credentials from environment variables
 const getRazorpayCredentials = () => {
     const keyId =
-        process.env.RAZORPAY_KEY_ID ||
-        process.env.API_KEY ||
-        process.env.RAZORPAY_KEY ||
-        "rzp_test_TUeuM9e49gLaL3";
+        process.env.RAZORPAY_KEY_ID
 
     const keySecret =
-        process.env.RAZORPAY_KEY_SECRET ||
-        process.env.SECREAT ||
-        process.env.SECRET ||
-        process.env.RAZORPAY_SECRET ||
-        "0MJa9tcl4VuHYcjZb4eL5Z5x";
+        process.env.RAZORPAY_KEY_SECRET
 
     return { keyId, keySecret };
 };

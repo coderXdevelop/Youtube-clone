@@ -5,12 +5,10 @@ import SubscriptionTransaction from "../model/subscriptionTransaction.js";
 
 // Razorpay Credential Helpers (supports API_KEY, SECREAT, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
 const getRazorpayKeyId = () =>
-    process.env.RAZORPAY_KEY_ID ||
-    "rzp_test_TUeuM9e49gLaL3";
+    process.env.RAZORPAY_KEY_ID
 
 const getRazorpayKeySecret = () =>
-    process.env.RAZORPAY_KEY_SECRET ||
-    "0MJa9tcl4VuHYcjZb4eL5Z5x";
+    process.env.RAZORPAY_KEY_SECRET
 
 // Comprehensive Plan Definitions with features and pricing
 export const SUBSCRIPTION_PLANS = {
