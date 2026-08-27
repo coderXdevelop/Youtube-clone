@@ -474,3 +474,38 @@ export const cancelUserSubscription = async (req, res) => {
         return res.status(500).json({ message: "Failed to cancel subscription." });
     }
 };
+
+/**
+ * POST /api/subscription/reset
+ * Reset user subscription back to Free plan & clean up transactions
+ */
+export const resetUserSubscriptionToFree = async (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    try {
+        await User.findByIdAndUpdate(userId, {
+            $set: {
+                subscriptionplan: "Free",
+                subscriptionbillingcycle: "none",
+                subscriptionstartdate: null,
+                subscriptionexpiresat: null,
+                subscriptionstatus: "none",
+                lastinvoicenumber: "",
+            },
+        });
+
+        await SubscriptionTransaction.deleteMany({ userid: userId });
+
+        return res.status(200).json({
+            success: true,
+            message: "User subscription has been reset back to Free plan successfully.",
+        });
+    } catch (error) {
+        console.error("resetUserSubscriptionToFree error:", error);
+        return res.status(500).json({ message: "Failed to reset subscription." });
+    }
+};
