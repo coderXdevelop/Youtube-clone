@@ -88,14 +88,14 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                         value={searchQuery}
                         onKeyPress={handleKeypress}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="rounded-l-full border-r-0 focus-visible:ring-0"
+                        className="rounded-l-full border-r-0 focus-visible:ring-0 bg-transparent text-gray-900 dark:text-white placeholder:text-gray-500 border-gray-300 dark:border-neutral-700"
                     />
                     <Button
                         type="submit"
                         className={cn(
                             "rounded-r-full px-6 border border-l-0",
                             isLight
-                                ? "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200"
+                                ? "bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300"
                                 : "bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700"
                         )}
                     >
@@ -106,7 +106,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                     variant="ghost"
                     size="icon"
                     className={cn(
-                        "rounded-full",
+                        "rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800",
                         isLight ? "text-gray-700" : "text-white"
                     )}
                 >
