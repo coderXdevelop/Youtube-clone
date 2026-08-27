@@ -1,6 +1,13 @@
 import video from "../model/video.js";
+import user from "../model/user.js";
+import history from "../model/history.js";
+import like from "../model/like.js";
+import watchlater from "../model/watchlater.js";
+import comment from "../model/comment.js";
+import downloadRecord from "../model/downloadRecord.js";
 import fs from "fs";
 import path from "path";
+import mongoose from "mongoose";
 
 export const UploadVideo = async (req, res) => {
     try {
@@ -87,5 +94,83 @@ export const getallvideo = async (req, res) => {
     } catch (error) {
         console.error("getallvideo error:", error);
         return res.status(500).json({ message: "Something went wrong fetching videos." });
+    }
+};
+
+/**
+ * Delete a video by channel owner or admin
+ * DELETE /api/video/:id
+ */
+export const deleteVideo = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.body?.userId || req.query?.userId || req.headers?.["x-user-id"];
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid video ID." });
+    }
+
+    try {
+        const targetVideo = await video.findById(id);
+        if (!targetVideo) {
+            return res.status(404).json({ message: "Video not found." });
+        }
+
+        // Authorization / Ownership check
+        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+            const requestingUser = await user.findById(userId);
+            const isOwner =
+                targetVideo.uploader === userId ||
+                (requestingUser?.channelname &&
+                    targetVideo.videochanel?.toLowerCase() === requestingUser.channelname?.toLowerCase()) ||
+                (requestingUser?.name &&
+                    targetVideo.videochanel?.toLowerCase() === requestingUser.name?.toLowerCase());
+
+            const isAdmin =
+                requestingUser?.user_type === "admin" ||
+                requestingUser?.isadmin === true;
+
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ message: "You are not authorized to delete this video." });
+            }
+        }
+
+        // 1. Clean up video file from disk if present
+        if (targetVideo.filepath && fs.existsSync(targetVideo.filepath)) {
+            try {
+                fs.unlinkSync(targetVideo.filepath);
+            } catch (fileErr) {
+                console.warn("Could not delete video file from disk:", fileErr.message);
+            }
+        }
+
+        // 2. Clean up thumbnail from disk if present
+        if (targetVideo.thumbnailpath && fs.existsSync(targetVideo.thumbnailpath)) {
+            try {
+                fs.unlinkSync(targetVideo.thumbnailpath);
+            } catch (thumbErr) {
+                console.warn("Could not delete thumbnail file from disk:", thumbErr.message);
+            }
+        }
+
+        // 3. Cascade cleanup associated records in MongoDB
+        await Promise.allSettled([
+            history.deleteMany({ videoid: id }),
+            like.deleteMany({ videoid: id }),
+            watchlater.deleteMany({ videoid: id }),
+            comment.deleteMany({ videoid: id }),
+            downloadRecord.deleteMany({ videoid: id }),
+        ]);
+
+        // 4. Delete the video document
+        await video.findByIdAndDelete(id);
+
+        return res.status(200).json({
+            success: true,
+            message: "Video deleted successfully from the platform.",
+            videoId: id,
+        });
+    } catch (error) {
+        console.error("deleteVideo error:", error);
+        return res.status(500).json({ message: "Failed to delete video." });
     }
 };

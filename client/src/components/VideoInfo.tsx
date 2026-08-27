@@ -8,12 +8,24 @@ import {
   Share,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useUser } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/AxiosInstance";
 import { Video } from "./VideoCard";
 import DownloadQuotaModal from "./DownloadQuotaModal";
+import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 interface VideoInfoProps {
   video: Video;
@@ -204,6 +216,36 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     }
   };
 
+  const router = useRouter();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isOwner = Boolean(
+    user &&
+      (video.uploader === user._id ||
+        (user.channelname &&
+          video.videochanel?.toLowerCase() === user.channelname?.toLowerCase()) ||
+        (user.name &&
+          video.videochanel?.toLowerCase() === user.name?.toLowerCase()))
+  );
+
+  const handleDeleteVideo = async () => {
+    if (!user) return;
+    try {
+      setIsDeleting(true);
+      await axiosInstance.delete(`/api/video/${video._id}?userId=${user._id}`, {
+        data: { userId: user._id },
+      });
+      router.push(user.channelname ? `/channel/${user._id}` : "/");
+    } catch (error) {
+      console.error("Failed to delete video:", error);
+      alert("Failed to delete video. Please try again.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">{video.videotitle}</h1>
@@ -220,7 +262,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button className="ml-4">Subscribe</Button>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 rounded-full">
+          <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-full">
             <Button
               variant="ghost"
               size="sm"
@@ -228,12 +270,12 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
               onClick={handleLike}
             >
               <ThumbsUp
-                className={`w-5 h-5 mr-2 ${isLiked ? "fill-black text-black" : ""
+                className={`w-5 h-5 mr-2 ${isLiked ? "fill-black text-black dark:fill-white dark:text-white" : ""
                   }`}
               />
               {likes.toLocaleString()}
             </Button>
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="w-px h-6 bg-gray-300 dark:bg-zinc-700" />
             <Button
               variant="ghost"
               size="sm"
@@ -241,7 +283,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
               onClick={handleDislike}
             >
               <ThumbsDown
-                className={`w-5 h-5 mr-2 ${isDisliked ? "fill-black text-black" : ""
+                className={`w-5 h-5 mr-2 ${isDisliked ? "fill-black text-black dark:fill-white dark:text-white" : ""
                   }`}
               />
               {dislikes.toLocaleString()}
@@ -250,7 +292,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className={`bg-gray-100 rounded-full ${isWatchLater ? "text-primary" : ""
+            className={`bg-gray-100 dark:bg-zinc-800 rounded-full ${isWatchLater ? "text-primary" : ""
               }`}
             onClick={handleWatchLater}
           >
@@ -260,7 +302,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="bg-gray-100 rounded-full"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full"
           >
             <Share className="w-5 h-5 mr-2" />
             Share
@@ -268,17 +310,30 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="bg-gray-100 rounded-full text-gray-800 hover:text-indigo-600 dark:hover:text-indigo-400"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"
             onClick={handleDownload}
             disabled={downloading}
           >
             <Download className={`w-5 h-5 mr-2 ${downloading ? "animate-bounce text-indigo-600" : ""}`} />
             {downloading ? "Downloading..." : "Download"}
           </Button>
+
+          {isOwner && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete Video</span>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
-            className="bg-gray-100 rounded-full"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full"
           >
             <MoreHorizontal className="w-5 h-5" />
           </Button>
@@ -296,15 +351,14 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           </button>
         </div>
       )}
-      <div className="bg-gray-100 rounded-lg p-4">
-        <div className="flex gap-4 text-sm font-medium mb-2">
+      <div className="bg-gray-100 dark:bg-zinc-900 rounded-lg p-4">
+        <div className="flex gap-4 text-sm font-medium mb-2 text-gray-900 dark:text-gray-100">
           <span>{video.views.toLocaleString()} views</span>
           <span>{formatDistanceToNow(new Date(video.createdAt))} ago</span>
         </div>
-        <div className={`text-sm ${showFullDescription ? "" : "line-clamp-3"}`}>
+        <div className={`text-sm text-gray-800 dark:text-gray-200 ${showFullDescription ? "" : "line-clamp-3"}`}>
           <p>
-            Sample video description. This would contain the actual video
-            description from the database.
+            {video.videodescription || video.description || "No description provided for this video."}
           </p>
         </div>
         <Button
@@ -316,6 +370,52 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           {showFullDescription ? "Show less" : "Show more"}
         </Button>
       </div>
+
+      {/* Owner Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 shadow-2xl rounded-2xl p-6">
+          <DialogHeader className="space-y-2">
+            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <DialogTitle className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              Delete Video Permanently?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to delete &quot;{video.videotitle}&quot;? This will delete the video file and its history from the platform.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteVideo}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Video
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quota Exceeded Modal */}
       {quotaData && (

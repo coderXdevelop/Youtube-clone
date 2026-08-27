@@ -97,6 +97,18 @@ const ChannelPage = () => {
         setRefreshIndex((prev) => prev + 1);
     };
 
+    const handleDeleteVideo = async (videoId: string) => {
+        if (!user) return;
+        try {
+            await axiosInstance.delete(`/api/video/${videoId}?userId=${user._id}`, {
+                data: { userId: user._id },
+            });
+            setChannelVideos((prev) => prev.filter((v) => v._id !== videoId));
+        } catch (error) {
+            console.error("Failed to delete video:", error);
+        }
+    };
+
     return (
         <div className="flex-1 min-h-screen bg-white dark:bg-zinc-950">
             <div className="max-w-7xl mx-auto">
@@ -119,7 +131,11 @@ const ChannelPage = () => {
                             Loading channel videos...
                         </div>
                     ) : (
-                        <ChannelVideos videos={channelVideos} />
+                        <ChannelVideos
+                            videos={channelVideos}
+                            isOwner={isChannelOwner}
+                            onDeleteVideo={handleDeleteVideo}
+                        />
                     )}
                 </div>
             </div>
