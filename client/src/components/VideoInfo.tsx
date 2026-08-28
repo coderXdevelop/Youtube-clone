@@ -248,42 +248,44 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{video.videotitle}</h1>
+      <h1 className="text-lg sm:text-xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{video.videotitle}</h1>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Avatar className="w-10 h-10">
-            <AvatarFallback>{video.videochanel[0]}</AvatarFallback>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 shrink-0">
+          <Avatar className="w-10 h-10 shrink-0">
+            <AvatarFallback className="font-semibold">{video.videochanel ? video.videochanel[0]?.toUpperCase() : "C"}</AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium">{video.videochanel}</h3>
-            <p className="text-sm text-gray-600">1.2M subscribers</p>
+            <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100">{video.videochanel}</h3>
+            <p className="text-xs text-gray-500">1.2M subscribers</p>
           </div>
-          <Button className="ml-4">Subscribe</Button>
+          <Button size="sm" className="ml-2 rounded-full px-4 text-xs font-semibold">Subscribe</Button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-full">
+
+        {/* Action Buttons with smooth touch scroll on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0 max-w-full">
+          <div className="flex items-center bg-gray-100 dark:bg-zinc-800 rounded-full shrink-0">
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-l-full"
+              className="rounded-l-full h-8 sm:h-9 text-xs px-3"
               onClick={handleLike}
             >
               <ThumbsUp
-                className={`w-5 h-5 mr-2 ${isLiked ? "fill-black text-black dark:fill-white dark:text-white" : ""
+                className={`w-4 h-4 mr-1.5 ${isLiked ? "fill-black text-black dark:fill-white dark:text-white" : ""
                   }`}
               />
               {likes.toLocaleString()}
             </Button>
-            <div className="w-px h-6 bg-gray-300 dark:bg-zinc-700" />
+            <div className="w-px h-5 bg-gray-300 dark:bg-zinc-700" />
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-r-full"
+              className="rounded-r-full h-8 sm:h-9 text-xs px-3"
               onClick={handleDislike}
             >
               <ThumbsDown
-                className={`w-5 h-5 mr-2 ${isDisliked ? "fill-black text-black dark:fill-white dark:text-white" : ""
+                className={`w-4 h-4 mr-1.5 ${isDisliked ? "fill-black text-black dark:fill-white dark:text-white" : ""
                   }`}
               />
               {dislikes.toLocaleString()}
@@ -292,29 +294,29 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className={`bg-gray-100 dark:bg-zinc-800 rounded-full ${isWatchLater ? "text-primary" : ""
+            className={`bg-gray-100 dark:bg-zinc-800 rounded-full h-8 sm:h-9 text-xs px-3 shrink-0 ${isWatchLater ? "text-primary font-semibold" : ""
               }`}
             onClick={handleWatchLater}
           >
-            <Clock className="w-5 h-5 mr-2" />
+            <Clock className="w-4 h-4 mr-1.5" />
             {isWatchLater ? "Saved" : "Watch Later"}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="bg-gray-100 dark:bg-zinc-800 rounded-full"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full h-8 sm:h-9 text-xs px-3 shrink-0"
           >
-            <Share className="w-5 h-5 mr-2" />
+            <Share className="w-4 h-4 mr-1.5" />
             Share
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="bg-gray-100 dark:bg-zinc-800 rounded-full text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full h-8 sm:h-9 text-xs px-3 shrink-0 text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"
             onClick={handleDownload}
             disabled={downloading}
           >
-            <Download className={`w-5 h-5 mr-2 ${downloading ? "animate-bounce text-indigo-600" : ""}`} />
+            <Download className={`w-4 h-4 mr-1.5 ${downloading ? "animate-bounce text-indigo-600" : ""}`} />
             {downloading ? "Downloading..." : "Download"}
           </Button>
 
@@ -322,10 +324,10 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             <Button
               variant="destructive"
               size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="bg-red-600 hover:bg-red-700 text-white rounded-full h-8 sm:h-9 text-xs px-3 flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
               onClick={() => setDeleteDialogOpen(true)}
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
               <span>Delete Video</span>
             </Button>
           )}
@@ -333,9 +335,9 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           <Button
             variant="ghost"
             size="icon"
-            className="bg-gray-100 dark:bg-zinc-800 rounded-full"
+            className="bg-gray-100 dark:bg-zinc-800 rounded-full h-8 w-8 sm:h-9 sm:w-9 shrink-0"
           >
-            <MoreHorizontal className="w-5 h-5" />
+            <MoreHorizontal className="w-4 h-4" />
           </Button>
         </div>
       </div>

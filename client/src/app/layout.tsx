@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { EnvironmentProvider } from "@/lib/EnvironmentContext";
 import { UserProvider } from "@/lib/AuthContext";
+import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "youtube",
-  description: "youtube clone",
+  title: "YourTube — Video Platform",
+  description: "Functional YouTube-style video platform with subscriptions, downloads, security, and multilingual comments.",
 };
 
 export default function RootLayout({
@@ -31,7 +32,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-gray-900 dark:text-gray-100 transition-colors">
         <UserProvider>
-          <EnvironmentProvider>{children}</EnvironmentProvider>
+          <EnvironmentProvider>
+            <AppShell>{children}</AppShell>
+          </EnvironmentProvider>
         </UserProvider>
       </body>
     </html>

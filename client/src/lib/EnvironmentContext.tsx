@@ -12,6 +12,10 @@ type EnvironmentContextType = {
     setTheme: (theme: ThemeMode) => void;
     setThemePreference: (pref: ThemePreference, userId?: string) => Promise<void>;
     applyLoginTheme: (theme: ThemeMode, preference?: ThemePreference) => void;
+    isSidebarOpen: boolean;
+    toggleSidebar: () => void;
+    setSidebarOpen: (open: boolean) => void;
+    closeSidebar: () => void;
 };
 
 const EnvironmentContext = createContext<EnvironmentContextType>({
@@ -20,6 +24,10 @@ const EnvironmentContext = createContext<EnvironmentContextType>({
     setTheme: () => {},
     setThemePreference: async () => {},
     applyLoginTheme: () => {},
+    isSidebarOpen: false,
+    toggleSidebar: () => {},
+    setSidebarOpen: () => {},
+    closeSidebar: () => {},
 });
 
 /**
@@ -41,6 +49,10 @@ export const computeCurrentIstTheme = (): ThemeMode => {
 export const EnvironmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [themePreference, setThemePreferenceState] = useState<ThemePreference>("auto");
     const [theme, setThemeState] = useState<ThemeMode>("light");
+    const [isSidebarOpen, setSidebarOpen] = useState(false);
+
+    const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+    const closeSidebar = () => setSidebarOpen(false);
 
     // Initialize from local storage or calculate IST time
     useEffect(() => {
@@ -116,6 +128,10 @@ export const EnvironmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 setTheme,
                 setThemePreference,
                 applyLoginTheme,
+                isSidebarOpen,
+                toggleSidebar,
+                setSidebarOpen,
+                closeSidebar,
             }}
         >
             {children}

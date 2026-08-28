@@ -550,6 +550,11 @@ export default function VideoPlayer({
     <div
       ref={containerRef}
       onMouseMove={resetControlsTimer}
+      onMouseLeave={() => {
+        if (isPlaying) {
+          setShowControls(false);
+        }
+      }}
       onClick={handleScreenClick}
       className={`relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl group select-none ${
         isFullscreen ? "rounded-none h-screen" : ""

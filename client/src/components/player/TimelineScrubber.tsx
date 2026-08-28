@@ -53,6 +53,12 @@ export default function TimelineScrubber({
     [calculatePosition, duration]
   );
 
+  useEffect(() => {
+    if (previewVideoRef.current && isFinite(hoverTime)) {
+      previewVideoRef.current.currentTime = hoverTime;
+    }
+  }, [hoverTime]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -91,19 +97,31 @@ export default function TimelineScrubber({
       onMouseDown={handleMouseDown}
       className="relative w-full h-4 group flex items-center cursor-pointer touch-none select-none py-1"
     >
-
       {/* Hover Preview Tooltip & Frame Thumbnail */}
       {(isHovering || isDragging) && duration > 0 && (
         <div
-          className="absolute -top-28 -translate-x-1/2 pointer-events-none flex flex-col items-center z-30 transition-transform duration-75"
-          style={{ left: `${hoverPercent}%` }}
+          className="absolute -top-32 -translate-x-1/2 pointer-events-none flex flex-col items-center z-30 transition-transform duration-75"
+          style={{
+            left: `clamp(75px, ${hoverPercent}%, calc(100% - 75px))`,
+          }}
         >
           {/* Frame Preview Card */}
-          <div className="w-32 h-18 bg-black rounded-lg overflow-hidden border border-zinc-700 shadow-xl mb-1 flex items-center justify-center relative">
+          <div className="w-36 h-20 bg-black rounded-lg overflow-hidden border border-zinc-700 shadow-2xl mb-1.5 flex items-center justify-center relative">
             {videoSrc ? (
-              <div className="w-full h-full bg-zinc-950 flex items-center justify-center text-[10px] text-zinc-400">
-                <span className="font-mono">{formatTime(hoverTime)}</span>
-              </div>
+              <>
+                <video
+                  ref={previewVideoRef}
+                  src={videoSrc}
+                  preload="auto"
+                  muted
+                  playsInline
+                  onLoadedMetadata={(e) => {
+                    (e.target as HTMLVideoElement).currentTime = hoverTime;
+                  }}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+              </>
             ) : (
               <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-white">
                 {formatTime(hoverTime)}
@@ -111,7 +129,7 @@ export default function TimelineScrubber({
             )}
           </div>
           {/* Timestamp Pill */}
-          <div className="bg-black/90 text-white text-[11px] font-semibold font-mono px-2 py-0.5 rounded shadow">
+          <div className="bg-black/90 text-white text-[11px] font-semibold font-mono px-2.5 py-0.5 rounded-full border border-zinc-700 shadow">
             {formatTime(hoverTime)}
           </div>
         </div>
