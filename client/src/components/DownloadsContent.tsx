@@ -131,23 +131,21 @@ export default function DownloadsContent() {
     }
 
     const planBadgeColors: Record<string, string> = {
-        Free: "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-300 border-gray-200 dark:border-zinc-700",
-        Bronze: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-        Silver: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700",
-        Gold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
+        Free: "bg-zinc-800 text-zinc-300 border-zinc-700",
+        Bronze: "bg-zinc-800 text-zinc-200 border-zinc-700",
+        Silver: "bg-zinc-800 text-zinc-200 border-zinc-700",
+        Gold: "bg-white text-zinc-950 font-bold border-white",
     };
 
     return (
         <div className="space-y-6">
             {/* Header: Title & Subscription Quota Banner */}
-            <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-
+            <div className="bg-zinc-900 border border-zinc-800 text-white rounded-2xl p-6 shadow-sm relative overflow-hidden">
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 backdrop-blur-sm">
-                                <Download className="w-3.5 h-3.5 text-indigo-300" />
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-zinc-200 border border-white/10 backdrop-blur-sm">
+                                <Download className="w-3.5 h-3.5 text-zinc-300" />
                                 Downloads Library
                             </span>
                             {quota && (
@@ -160,40 +158,40 @@ export default function DownloadsContent() {
                         <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
                             Offline Video Downloads
                         </h1>
-                        <p className="text-sm text-indigo-200 max-w-xl leading-relaxed">
-                            Access all your downloaded videos, re-download within 24 hours for free, and manage your daily quota.
+                        <p className="text-sm text-zinc-400 max-w-xl leading-relaxed">
+                            Access your downloaded videos, re-download within 24 hours for free, and manage your daily quota.
                         </p>
                     </div>
 
                     {/* Quota Progress Card */}
                     {quota && (
-                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/15 min-w-[240px] space-y-2.5">
+                        <div className="bg-zinc-800/80 backdrop-blur-md p-4 rounded-xl border border-zinc-700 min-w-[240px] space-y-2.5">
                             <div className="flex items-center justify-between text-xs font-medium">
-                                <span className="text-indigo-200">Daily Quota:</span>
+                                <span className="text-zinc-300">Daily Quota:</span>
                                 <span className="font-bold text-white">
                                     {quota.usedToday} / {quota.limit} Used
                                 </span>
                             </div>
 
-                            <div className="w-full bg-black/30 h-2 rounded-full overflow-hidden">
+                            <div className="w-full bg-zinc-950 h-2 rounded-full overflow-hidden">
                                 <div
-                                    className="bg-gradient-to-r from-emerald-400 to-indigo-400 h-full rounded-full transition-all duration-500"
+                                    className="bg-white h-full rounded-full transition-all duration-500"
                                     style={{
                                         width: `${Math.min(100, (quota.usedToday / Math.max(1, quota.limit)) * 100)}%`,
                                     }}
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between text-[11px] text-indigo-200 pt-0.5">
+                            <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-0.5">
                                 <span className="flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3 text-amber-300" />
+                                    <Sparkles className="w-3 h-3 text-zinc-300" />
                                     {quota.remainingQuota} remaining today
                                 </span>
                                 {quota.plan === "Free" && (
                                     <Button
                                         size="sm"
                                         variant="secondary"
-                                        className="h-6 px-2 text-[11px] bg-white text-indigo-950 hover:bg-indigo-50 font-bold"
+                                        className="h-6 px-2 text-[11px] bg-white text-zinc-950 hover:bg-zinc-200 font-bold cursor-pointer"
                                         onClick={() => setIsQuotaModalOpen(true)}
                                     >
                                         Upgrade

@@ -85,7 +85,7 @@ export default function AutoplayOverlay({
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
                 <path
-                  className="text-red-600 transition-all duration-1000 ease-linear"
+                  className="text-white transition-all duration-1000 ease-linear"
                   strokeDasharray={`${progressPercentage}, 100`}
                   strokeWidth="3.5"
                   strokeLinecap="round"
@@ -118,9 +118,9 @@ export default function AutoplayOverlay({
           </Button>
           <Button
             onClick={onPlayNext}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 bg-white hover:bg-zinc-200 text-black text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <Play className="w-3.5 h-3.5 fill-current text-black" />
             Play Now
           </Button>
         </div>

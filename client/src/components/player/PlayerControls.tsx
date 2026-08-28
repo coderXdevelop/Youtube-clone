@@ -155,7 +155,7 @@ export default function PlayerControls({
 
         {/* Volume Controls */}
         <div
-          className="flex items-center group relative"
+          className="flex items-center group/volume relative"
           onMouseEnter={() => setIsVolumeSliderHovered(true)}
           onMouseLeave={() => setIsVolumeSliderHovered(false)}
         >
@@ -167,22 +167,40 @@ export default function PlayerControls({
             {renderVolumeIcon()}
           </button>
 
-          {/* Draggable Volume Slider */}
+          {/* YouTube-styled Horizontal Volume Bar with Slider Thumb */}
           <div
             className={`flex items-center transition-all duration-200 overflow-hidden ${
-              isVolumeSliderHovered ? "w-20 md:w-24 opacity-100 ml-1.5" : "w-0 opacity-0"
+              isVolumeSliderHovered ? "w-16 md:w-20 opacity-100 ml-1" : "w-0 opacity-0"
             }`}
           >
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={effectiveVolume}
-              onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer accent-white hover:accent-red-600 focus:outline-none"
-              title={`Volume: ${Math.round(effectiveVolume * 100)}%`}
-            />
+            <div className="relative w-full h-6 flex items-center cursor-pointer">
+              {/* Background track */}
+              <div className="w-full h-1 bg-white/30 rounded-full overflow-hidden relative">
+                {/* Left-filled active volume portion */}
+                <div
+                  className="h-full bg-white rounded-full transition-all duration-75"
+                  style={{ width: `${effectiveVolume * 100}%` }}
+                />
+              </div>
+
+              {/* White round slider thumb at active level */}
+              <div
+                className="absolute -translate-x-1/2 w-3 h-3 bg-white rounded-full shadow-md pointer-events-none transition-all duration-75"
+                style={{ left: `${effectiveVolume * 100}%` }}
+              />
+
+              {/* Range input on top for smooth native drag & accessibility */}
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={effectiveVolume}
+                onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title={`Volume: ${Math.round(effectiveVolume * 100)}%`}
+              />
+            </div>
           </div>
         </div>
 
@@ -202,18 +220,30 @@ export default function PlayerControls({
 
       {/* Right controls: Autoplay, Subtitles, Settings, PiP, Theater, Fullscreen */}
       <div className="flex items-center gap-1 md:gap-2">
-        {/* Autoplay Toggle */}
+        {/* Autoplay Toggle Switch (YouTube Black & White theme) */}
         <button
           onClick={onToggleAutoplay}
-          className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full hover:bg-white/20 transition text-xs font-medium cursor-pointer"
+          className="hidden sm:flex items-center gap-2 px-2 py-1.5 rounded-full hover:bg-white/20 transition cursor-pointer"
           title={`Autoplay is ${autoplayEnabled ? "ON" : "OFF"}`}
         >
-          <span className="text-[11px] text-zinc-300">Autoplay</span>
-          {autoplayEnabled ? (
-            <ToggleRight className="w-5 h-5 text-red-500" />
-          ) : (
-            <ToggleLeft className="w-5 h-5 text-zinc-400" />
-          )}
+          <span className="text-[11px] font-medium text-zinc-300">Autoplay</span>
+          <div
+            className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-200 ease-in-out relative flex items-center ${
+              autoplayEnabled ? "bg-white" : "bg-white/30"
+            }`}
+          >
+            <div
+              className={`w-3 h-3 rounded-full shadow-sm transform transition-transform duration-200 ease-in-out flex items-center justify-center ${
+                autoplayEnabled
+                  ? "translate-x-3 bg-black text-white"
+                  : "translate-x-0 bg-white text-zinc-800"
+              }`}
+            >
+              {autoplayEnabled ? (
+                <Play className="w-1.5 h-1.5 fill-current text-white ml-0.5" />
+              ) : null}
+            </div>
+          </div>
         </button>
 
         {/* Subtitles / CC Toggle */}

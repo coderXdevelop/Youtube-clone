@@ -29,9 +29,6 @@ interface DestinationCard {
     title: string;
     description: string;
     icon: React.ElementType;
-    gradient: string;
-    iconBg: string;
-    textColor: string;
 }
 
 const DESTINATIONS: DestinationCard[] = [
@@ -40,72 +37,48 @@ const DESTINATIONS: DestinationCard[] = [
         title: "Trending",
         description: "What's viral & popular now",
         icon: Flame,
-        gradient: "from-orange-500/20 to-red-500/20 hover:from-orange-500/30 hover:to-red-500/30 border-orange-200 dark:border-orange-900/40",
-        iconBg: "bg-gradient-to-tr from-orange-600 to-red-500 text-white",
-        textColor: "text-orange-600 dark:text-orange-400",
     },
     {
         id: "Music",
         title: "Music",
         description: "Top hits, songs & beats",
         icon: Music,
-        gradient: "from-violet-500/20 to-purple-500/20 hover:from-violet-500/30 hover:to-purple-500/30 border-purple-200 dark:border-purple-900/40",
-        iconBg: "bg-gradient-to-tr from-violet-600 to-purple-500 text-white",
-        textColor: "text-purple-600 dark:text-purple-400",
     },
     {
         id: "Gaming",
         title: "Gaming",
         description: "Streams, gameplays & guides",
         icon: Gamepad2,
-        gradient: "from-pink-500/20 to-rose-500/20 hover:from-pink-500/30 hover:to-rose-500/30 border-pink-200 dark:border-pink-900/40",
-        iconBg: "bg-gradient-to-tr from-pink-600 to-rose-500 text-white",
-        textColor: "text-pink-600 dark:text-pink-400",
     },
     {
         id: "News",
         title: "News",
         description: "Breaking updates & world events",
         icon: Newspaper,
-        gradient: "from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 border-blue-200 dark:border-blue-900/40",
-        iconBg: "bg-gradient-to-tr from-blue-600 to-cyan-500 text-white",
-        textColor: "text-blue-600 dark:text-blue-400",
     },
     {
         id: "Sports",
         title: "Sports",
         description: "Matches, highlights & fitness",
         icon: Trophy,
-        gradient: "from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border-emerald-200 dark:border-emerald-900/40",
-        iconBg: "bg-gradient-to-tr from-emerald-600 to-teal-500 text-white",
-        textColor: "text-emerald-600 dark:text-emerald-400",
     },
     {
         id: "Learning",
         title: "Courses & Learning",
         description: "Code, science & tutorials",
         icon: GraduationCap,
-        gradient: "from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 border-amber-200 dark:border-amber-900/40",
-        iconBg: "bg-gradient-to-tr from-amber-600 to-yellow-500 text-white",
-        textColor: "text-amber-600 dark:text-amber-400",
     },
     {
         id: "Movies",
         title: "Movies & Shows",
         description: "Trailers, scenes & cinema",
         icon: Clapperboard,
-        gradient: "from-red-500/20 to-rose-500/20 hover:from-red-500/30 hover:to-rose-500/30 border-red-200 dark:border-red-900/40",
-        iconBg: "bg-gradient-to-tr from-red-600 to-rose-500 text-white",
-        textColor: "text-red-600 dark:text-red-400",
     },
     {
         id: "Fashion",
         title: "Fashion & Beauty",
         description: "Style, trends & makeover",
         icon: Sparkles,
-        gradient: "from-fuchsia-500/20 to-pink-500/20 hover:from-fuchsia-500/30 hover:to-pink-500/30 border-fuchsia-200 dark:border-fuchsia-900/40",
-        iconBg: "bg-gradient-to-tr from-fuchsia-600 to-pink-500 text-white",
-        textColor: "text-fuchsia-600 dark:text-fuchsia-400",
     },
 ];
 
@@ -172,19 +145,17 @@ export default function ExploreContent() {
     return (
         <div className="space-y-8">
             {/* 1. Header Banner */}
-            <div className="bg-gradient-to-r from-gray-900 via-zinc-900 to-stone-900 text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
-                <div className="absolute right-0 top-0 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-
+            <div className="bg-zinc-900 border border-zinc-800 text-white rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden">
                 <div className="relative z-10 space-y-2 max-w-2xl">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 text-red-400 border border-white/10 backdrop-blur-sm">
-                        <Compass className="w-4 h-4 text-red-500 animate-spin-slow" />
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-zinc-200 border border-white/10 backdrop-blur-sm">
+                        <Compass className="w-4 h-4 text-red-500" />
                         <span>Discover & Explore</span>
                     </div>
                     <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
                         Explore What&apos;s Next
                     </h1>
-                    <p className="text-xs md:text-sm text-gray-300 leading-relaxed">
-                        Discover top trending videos, viral clips, gaming streams, latest hits, and masterclasses curated from around the platform.
+                    <p className="text-xs md:text-sm text-zinc-400 leading-relaxed">
+                        Discover top trending videos, gaming streams, latest hits, and tutorials curated across the platform.
                     </p>
                 </div>
             </div>
@@ -199,22 +170,24 @@ export default function ExploreContent() {
                         <button
                             key={dest.id}
                             onClick={() => setSelectedDestination(dest.id)}
-                            className={`p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between group relative overflow-hidden ${
+                            className={`p-4 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between group relative cursor-pointer ${
                                 isSelected
-                                    ? "bg-gray-900 text-white dark:bg-white dark:text-zinc-900 shadow-lg border-gray-900 dark:border-white scale-[1.02]"
-                                    : `bg-white dark:bg-zinc-900/60 hover:bg-gray-50 dark:hover:bg-zinc-800/80 border-gray-200 dark:border-zinc-800 shadow-sm hover:shadow-md`
+                                    ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-md scale-[1.01]"
+                                    : "bg-white dark:bg-zinc-900/90 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-800"
                             }`}
                         >
                             <div className="flex items-center justify-between mb-3">
                                 <div
-                                    className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md transition-transform group-hover:scale-110 ${
-                                        isSelected ? "bg-red-500 text-white" : dest.iconBg
+                                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                                        isSelected
+                                            ? "bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white"
+                                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700"
                                     }`}
                                 >
-                                    <Icon className="w-5 h-5" />
+                                    <Icon className={`w-4 h-4 ${dest.id === "Trending" ? "text-red-500" : ""}`} />
                                 </div>
                                 {isSelected && (
-                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                                 )}
                             </div>
                             <div className="space-y-0.5">
@@ -222,7 +195,7 @@ export default function ExploreContent() {
                                     className={`font-bold text-sm leading-tight ${
                                         isSelected
                                             ? "text-white dark:text-zinc-900"
-                                            : "text-gray-900 dark:text-gray-100"
+                                            : "text-zinc-900 dark:text-zinc-100"
                                     }`}
                                 >
                                     {dest.title}
@@ -230,8 +203,8 @@ export default function ExploreContent() {
                                 <p
                                     className={`text-[11px] line-clamp-1 ${
                                         isSelected
-                                            ? "text-gray-300 dark:text-zinc-600"
-                                            : "text-gray-500 dark:text-gray-400"
+                                            ? "text-zinc-300 dark:text-zinc-600"
+                                            : "text-zinc-500 dark:text-zinc-400"
                                     }`}
                                 >
                                     {dest.description}
@@ -243,12 +216,12 @@ export default function ExploreContent() {
             </div>
 
             {/* 3. Section Title & Results Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-800 pb-3">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
                 <div className="flex items-center gap-2">
                     {selectedDestination === "Trending" ? (
                         <Flame className="w-5 h-5 text-red-500 fill-red-500" />
                     ) : (
-                        <TrendingUp className="w-5 h-5 text-indigo-500" />
+                        <TrendingUp className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
                     )}
                     <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                         {selectedDestination === "Trending" ? "Trending Now" : `${selectedDestination} Videos`}

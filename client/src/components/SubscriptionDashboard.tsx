@@ -191,43 +191,33 @@ export default function SubscriptionDashboard() {
     return (
         <div className="space-y-10 pb-12">
             {/* 1. Header Banner & Status */}
-            <div className="bg-gradient-to-r from-indigo-950 via-indigo-900 to-purple-950 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-                <div className="absolute -right-10 -top-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
+            <div className="bg-zinc-900 border border-zinc-800 text-white rounded-3xl p-8 shadow-sm relative overflow-hidden">
                 <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div className="space-y-3 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md border border-white/20 text-indigo-200">
-                            <Crown className="w-4 h-4 text-amber-400" />
-                            <span>YouTube Clone Premium Membership</span>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 backdrop-blur-md border border-white/10 text-zinc-200">
+                            <Crown className="w-4 h-4 text-white" />
+                            <span>YouTube Clone Premium</span>
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-                            Choose the Perfect Plan for Your Experience
+                            Choose the Perfect Plan for You
                         </h1>
-                        <p className="text-sm sm:text-base text-indigo-200 leading-relaxed">
+                        <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
                             Unlock offline video downloads, crystal-clear 4K HDR streaming, 100% ad-free viewing, and exclusive creator courses.
                         </p>
                     </div>
 
                     {/* Current Active Plan Badge / Card */}
-                    <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 min-w-[280px] space-y-3 shadow-lg">
+                    <div className="bg-zinc-800/80 backdrop-blur-md p-5 rounded-2xl border border-zinc-700 min-w-[280px] space-y-3 shadow-sm">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs text-indigo-200 font-medium">Your Current Plan:</span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold uppercase ${
-                                currentPlanName === "Gold"
-                                    ? "bg-amber-400 text-indigo-950"
-                                    : currentPlanName === "Silver"
-                                    ? "bg-slate-300 text-slate-900"
-                                    : currentPlanName === "Bronze"
-                                    ? "bg-amber-600 text-white"
-                                    : "bg-white/20 text-white"
-                            }`}>
+                            <span className="text-xs text-zinc-300 font-medium">Your Current Plan:</span>
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-white text-zinc-950">
                                 {currentPlanName} Plan
                             </span>
                         </div>
 
                         {currentPlanName !== "Free" && userSub?.expiresAt ? (
-                            <div className="space-y-2 border-t border-white/10 pt-2 text-xs">
-                                <div className="flex items-center justify-between text-indigo-200">
+                            <div className="space-y-2 border-t border-zinc-700 pt-2 text-xs">
+                                <div className="flex items-center justify-between text-zinc-300">
                                     <span className="flex items-center gap-1">
                                         <Clock className="w-3.5 h-3.5" />
                                         Remaining:
@@ -236,7 +226,7 @@ export default function SubscriptionDashboard() {
                                         {userSub.daysRemaining} days left
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between text-indigo-200">
+                                <div className="flex items-center justify-between text-zinc-300">
                                     <span className="flex items-center gap-1">
                                         <Calendar className="w-3.5 h-3.5" />
                                         Valid Until:
@@ -246,7 +236,7 @@ export default function SubscriptionDashboard() {
                                     </span>
                                 </div>
                                 {userSub.status === "cancelled" ? (
-                                    <span className="inline-block text-[11px] text-amber-300 font-medium">
+                                    <span className="inline-block text-[11px] text-zinc-400 font-medium">
                                         Auto-renewal cancelled (access valid till expiry)
                                     </span>
                                 ) : (
@@ -254,14 +244,14 @@ export default function SubscriptionDashboard() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={handleCancelSubscription}
-                                        className="h-6 px-0 text-[11px] text-red-300 hover:text-red-200 hover:bg-transparent"
+                                        className="h-6 px-0 text-[11px] text-zinc-400 hover:text-white hover:bg-transparent"
                                     >
                                         Cancel Subscription
                                     </Button>
                                 )}
                             </div>
                         ) : (
-                            <p className="text-xs text-indigo-200 leading-relaxed border-t border-white/10 pt-2">
+                            <p className="text-xs text-zinc-400 leading-relaxed border-t border-zinc-700 pt-2">
                                 Upgrade today to download more videos daily and stream in Full HD without ads.
                             </p>
                         )}
@@ -270,14 +260,14 @@ export default function SubscriptionDashboard() {
             </div>
 
             {feedbackMessage && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-sm rounded-2xl border border-emerald-200 dark:border-emerald-900 flex items-center justify-between shadow-sm">
+                <div className="p-4 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm rounded-2xl border border-zinc-200 dark:border-zinc-700 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-red-600 flex-shrink-0" />
                         <span>{feedbackMessage}</span>
                     </div>
                     <button
                         onClick={() => setFeedbackMessage(null)}
-                        className="text-xs hover:underline font-semibold"
+                        className="text-xs hover:underline font-semibold cursor-pointer"
                     >
                         Dismiss
                     </button>
@@ -286,43 +276,43 @@ export default function SubscriptionDashboard() {
 
             {/* 2. Billing Cycle Switcher */}
             <div className="flex flex-col items-center justify-center space-y-3">
-                <span className="text-xs uppercase font-bold tracking-widest text-gray-500 dark:text-gray-400">
-                    Select Billing Period
+                <span className="text-xs uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-400">
+                    Billing Cycle
                 </span>
-                <div className="bg-gray-100 dark:bg-zinc-800/80 p-1.5 rounded-2xl flex items-center gap-1 border border-gray-200 dark:border-zinc-700">
+                <div className="bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl flex items-center gap-1 border border-zinc-200 dark:border-zinc-800">
                     <button
                         onClick={() => setBillingCycle("monthly")}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             billingCycle === "monthly"
-                                ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                         }`}
                     >
                         Monthly
                     </button>
                     <button
                         onClick={() => setBillingCycle("quarterly")}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             billingCycle === "quarterly"
-                                ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                         }`}
                     >
                         <span>Quarterly (3 Mo)</span>
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300">
                             Save ~16%
                         </span>
                     </button>
                     <button
                         onClick={() => setBillingCycle("yearly")}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             billingCycle === "yearly"
-                                ? "bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
-                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-sm"
+                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                         }`}
                     >
                         <span>Yearly (12 Mo)</span>
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white">
                             Save ~25%
                         </span>
                     </button>
@@ -340,15 +330,15 @@ export default function SubscriptionDashboard() {
                         return (
                             <div
                                 key={key}
-                                className={`rounded-3xl border p-6 flex flex-col justify-between transition-all duration-300 relative ${
+                                className={`rounded-3xl border p-6 flex flex-col justify-between transition-all duration-200 relative ${
                                     isPopular
-                                        ? "border-indigo-500 dark:border-indigo-500 shadow-xl bg-gradient-to-b from-indigo-50/50 to-white dark:from-indigo-950/30 dark:to-zinc-900 ring-2 ring-indigo-500/20"
-                                        : "border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md"
+                                        ? "border-zinc-900 dark:border-white shadow-md bg-white dark:bg-zinc-900 ring-1 ring-zinc-900 dark:ring-white"
+                                        : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-sm hover:shadow"
                                 }`}
                             >
                                 {isPopular && (
                                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                        <span className="bg-indigo-600 text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-md">
+                                        <span className="bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
                                             Most Popular
                                         </span>
                                     </div>
@@ -356,31 +346,31 @@ export default function SubscriptionDashboard() {
 
                                 <div className="space-y-4">
                                     <div className="space-y-1">
-                                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                                             {plan.name}
                                         </h3>
-                                        <p className="text-xs text-gray-500 min-h-[32px] leading-snug">
+                                        <p className="text-xs text-zinc-500 min-h-[32px] leading-snug">
                                             {plan.tagline}
                                         </p>
                                     </div>
 
                                     {/* Price */}
-                                    <div className="py-2 border-y border-gray-100 dark:border-zinc-800">
+                                    <div className="py-2 border-y border-zinc-100 dark:border-zinc-800">
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+                                            <span className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-100">
                                                 ₹{price.toLocaleString()}
                                             </span>
-                                            <span className="text-xs text-gray-500">
+                                            <span className="text-xs text-zinc-500">
                                                 {price === 0 ? "forever" : `/${billingCycle === "yearly" ? "yr" : billingCycle === "quarterly" ? "3 mo" : "mo"}`}
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Feature Highlights */}
-                                    <ul className="space-y-2.5 text-xs text-gray-700 dark:text-gray-300">
+                                    <ul className="space-y-2.5 text-xs text-zinc-700 dark:text-zinc-300">
                                         {plan.features.map((f, i) => (
                                             <li key={i} className="flex items-start gap-2">
-                                                <div className="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                <div className="w-4 h-4 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                                                     <Check className="w-3 h-3 stroke-[3]" />
                                                 </div>
                                                 <span>{f}</span>
@@ -394,17 +384,17 @@ export default function SubscriptionDashboard() {
                                     {isCurrent ? (
                                         <Button
                                             disabled
-                                            className="w-full text-xs font-bold bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 cursor-default h-10 rounded-xl"
+                                            className="w-full text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default h-10 rounded-xl"
                                         >
                                             Current Plan
                                         </Button>
                                     ) : (
                                         <Button
                                             onClick={() => handleSelectPlan(key)}
-                                            className={`w-full text-xs font-bold h-10 rounded-xl shadow-sm transition-all ${
+                                            className={`w-full text-xs font-bold h-10 rounded-xl transition-all cursor-pointer ${
                                                 isPopular
-                                                    ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 dark:shadow-none"
-                                                    : "bg-gray-900 hover:bg-gray-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                                                    ? "bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                                                    : "bg-zinc-900 hover:bg-black text-white dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
                                             }`}
                                         >
                                             {key === "Free" ? "Downgrade" : `Upgrade to ${key}`}
@@ -417,12 +407,12 @@ export default function SubscriptionDashboard() {
             </div>
 
             {/* 4. Full Feature Comparison Matrix */}
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 md:p-8 space-y-6 shadow-sm">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 md:p-8 space-y-6 shadow-sm">
                 <div className="space-y-1">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                         Feature Comparison Matrix
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-zinc-500">
                         Compare streaming quality, daily download quotas, and benefits across all membership tiers.
                     </p>
                 </div>
@@ -430,12 +420,12 @@ export default function SubscriptionDashboard() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr className="border-b border-gray-200 dark:border-zinc-800 text-gray-500 dark:text-gray-400">
+                            <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400">
                                 <th className="py-3 px-4 font-semibold">Features & Benefits</th>
                                 <th className="py-3 px-4 font-semibold text-center">Free</th>
                                 <th className="py-3 px-4 font-semibold text-center">Bronze</th>
-                                <th className="py-3 px-4 font-semibold text-center text-indigo-600 dark:text-indigo-400 font-bold">Silver (Popular)</th>
-                                <th className="py-3 px-4 font-semibold text-center text-amber-600 dark:text-amber-400 font-bold">Gold (VIP)</th>
+                                <th className="py-3 px-4 font-semibold text-center font-bold text-zinc-900 dark:text-white">Silver (Popular)</th>
+                                <th className="py-3 px-4 font-semibold text-center font-bold text-zinc-900 dark:text-white">Gold (VIP)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-zinc-800/60 text-gray-800 dark:text-gray-200">

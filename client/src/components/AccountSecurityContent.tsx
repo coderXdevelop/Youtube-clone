@@ -165,35 +165,35 @@ export default function AccountSecurityContent() {
     return (
         <div className="space-y-8 pb-12">
             {/* Header Banner */}
-            <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-neutral-950 text-white rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden border border-indigo-900/30">
+            <div className="bg-zinc-900 border border-zinc-800 text-white rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="space-y-2 max-w-xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md border border-white/20 text-indigo-200">
-                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                            <span>Enhanced Account Protection</span>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 backdrop-blur-md border border-white/10 text-zinc-200">
+                            <ShieldCheck className="w-4 h-4 text-white" />
+                            <span>Account Protection</span>
                         </div>
                         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                            Account Security & Session Management
+                            Account Security & Sessions
                         </h1>
-                        <p className="text-xs sm:text-sm text-indigo-200 leading-relaxed">
+                        <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
                             Manage your time-based personalized theme, 2FA OTP verification on unfamiliar devices, active sessions, and audit login history.
                         </p>
                     </div>
 
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 min-w-[240px] space-y-2">
+                    <div className="bg-zinc-800/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-700 min-w-[240px] space-y-2">
                         <div className="flex items-center justify-between text-xs">
-                            <span className="text-indigo-200">2FA Security Status:</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400 text-slate-950 uppercase">
+                            <span className="text-zinc-300">2FA Security Status:</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-zinc-950 uppercase">
                                 ACTIVE
                             </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-indigo-200 border-t border-white/10 pt-2">
+                        <div className="flex items-center justify-between text-xs text-zinc-300 border-t border-zinc-700 pt-2">
                             <span>Trusted Devices:</span>
                             <span className="font-bold text-white">{trustedDevices.length} registered</span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-indigo-200">
+                        <div className="flex items-center justify-between text-xs text-zinc-300">
                             <span>Active Theme Mode:</span>
-                            <span className="font-bold text-amber-300 capitalize">{theme} mode</span>
+                            <span className="font-bold text-white capitalize">{theme} mode</span>
                         </div>
                     </div>
                 </div>
@@ -204,12 +204,12 @@ export default function AccountSecurityContent() {
                 <div
                     className={`p-4 rounded-2xl text-xs border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${
                         feedbackMessage.type === "success"
-                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800"
+                            ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-200 dark:border-zinc-700"
                             : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
                     }`}
                 >
                     {feedbackMessage.type === "success" ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-zinc-900 dark:text-zinc-100 flex-shrink-0" />
                     ) : (
                         <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
                     )}
@@ -218,18 +218,18 @@ export default function AccountSecurityContent() {
             )}
 
             {/* 1. Theme Personalization Section */}
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-zinc-800 pb-4">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
                     <div className="space-y-1">
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-red-600" />
                             Personalized Theme Preferences
                         </h2>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-zinc-500">
                             Configure automatic time-based theme adaptation or choose your preferred constant mode.
                         </p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                         <Clock className="w-3.5 h-3.5" />
                         5:00 AM – 12:00 PM IST: Light Mode
                     </span>
@@ -242,29 +242,29 @@ export default function AccountSecurityContent() {
                         onClick={() => handleThemeChange("auto")}
                         className={`p-5 rounded-2xl border text-left space-y-3 transition-all cursor-pointer ${
                             activeThemePref === "auto"
-                                ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 dark:border-indigo-500 shadow-md"
-                                : "border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/60"
+                                ? "border-zinc-900 bg-zinc-50 dark:border-white dark:bg-zinc-800 shadow-sm ring-1 ring-zinc-900 dark:ring-white"
+                                : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                         }`}
                     >
                         <div className="flex items-center justify-between">
-                            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 flex items-center justify-center font-bold">
                                 <Clock className="w-5 h-5" />
                             </div>
                             {activeThemePref === "auto" && (
-                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">
                                     Active
                                 </span>
                             )}
                         </div>
                         <div>
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                                 Automatic (IST Time)
                             </h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
                                 Automatically switches to Light theme from 5:00 AM to 12:00 PM IST, and Dark theme during other times.
                             </p>
                         </div>
-                        <div className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300 pt-1">
+                        <div className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 pt-1">
                             Current IST Evaluation: <strong className="uppercase">{istThemeCalculated}</strong>
                         </div>
                     </button>
@@ -275,25 +275,25 @@ export default function AccountSecurityContent() {
                         onClick={() => handleThemeChange("light")}
                         className={`p-5 rounded-2xl border text-left space-y-3 transition-all cursor-pointer ${
                             activeThemePref === "light"
-                                ? "border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 dark:border-amber-500 shadow-md"
-                                : "border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/60"
+                                ? "border-zinc-900 bg-zinc-50 dark:border-white dark:bg-zinc-800 shadow-sm ring-1 ring-zinc-900 dark:ring-white"
+                                : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                         }`}
                     >
                         <div className="flex items-center justify-between">
-                            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
+                            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 flex items-center justify-center font-bold">
                                 <Sun className="w-5 h-5" />
                             </div>
                             {activeThemePref === "light" && (
-                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500 text-white">
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">
                                     Active
                                 </span>
                             )}
                         </div>
                         <div>
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                                 Always Light Theme
                             </h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
                                 Keep the bright, crisp light theme active at all times regardless of login time.
                             </p>
                         </div>
@@ -305,25 +305,25 @@ export default function AccountSecurityContent() {
                         onClick={() => handleThemeChange("dark")}
                         className={`p-5 rounded-2xl border text-left space-y-3 transition-all cursor-pointer ${
                             activeThemePref === "dark"
-                                ? "border-purple-600 bg-purple-50/70 dark:bg-purple-950/40 dark:border-purple-500 shadow-md"
-                                : "border-gray-200 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/60"
+                                ? "border-zinc-900 bg-zinc-50 dark:border-white dark:bg-zinc-800 shadow-sm ring-1 ring-zinc-900 dark:ring-white"
+                                : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                         }`}
                     >
                         <div className="flex items-center justify-between">
-                            <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
+                            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 flex items-center justify-center font-bold">
                                 <Moon className="w-5 h-5" />
                             </div>
                             {activeThemePref === "dark" && (
-                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-600 text-white">
                                     Active
                                 </span>
                             )}
                         </div>
                         <div>
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                                 Always Dark Theme
                             </h4>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
                                 Keep sleek, eye-friendly dark mode active across all sessions and devices.
                             </p>
                         </div>
@@ -332,14 +332,14 @@ export default function AccountSecurityContent() {
             </div>
 
             {/* 2. Trusted Devices Management Section */}
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-zinc-800 pb-4">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
                     <div className="space-y-1">
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                            <Laptop className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <Laptop className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
                             Trusted Devices & Browsers
                         </h2>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-zinc-500">
                             Logins from these recognized devices bypass 2FA OTP security challenges for 30 days.
                         </p>
                     </div>
@@ -348,7 +348,7 @@ export default function AccountSecurityContent() {
                         variant="outline"
                         onClick={loadSecurityData}
                         disabled={loading}
-                        className="text-xs h-8"
+                        className="text-xs h-8 cursor-pointer"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
                         Refresh
@@ -356,7 +356,7 @@ export default function AccountSecurityContent() {
                 </div>
 
                 {trustedDevices.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-gray-500">
+                    <div className="py-8 text-center text-xs text-zinc-500">
                         No trusted devices registered yet. Logins from new browsers will prompt for OTP verification.
                     </div>
                 ) : (
@@ -364,12 +364,12 @@ export default function AccountSecurityContent() {
                         {trustedDevices.map((dev, idx) => (
                             <div
                                 key={dev.deviceid || idx}
-                                className="p-4 rounded-2xl border border-gray-200 dark:border-zinc-800 bg-gray-50/50 dark:bg-zinc-800/40 space-y-3 flex flex-col justify-between"
+                                className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40 space-y-3 flex flex-col justify-between"
                             >
                                 <div className="space-y-2">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center">
+                                            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center justify-center">
                                                 {dev.devicetype === "Mobile" ? (
                                                     <Smartphone className="w-4 h-4" />
                                                 ) : dev.devicetype === "Tablet" ? (
@@ -379,26 +379,26 @@ export default function AccountSecurityContent() {
                                                 )}
                                             </div>
                                             <div>
-                                                <h4 className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                                                <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
                                                     {dev.devicename || `${dev.browser} on ${dev.os}`}
                                                 </h4>
-                                                <span className="text-[11px] text-gray-500 font-mono">
+                                                <span className="text-[11px] text-zinc-500 font-mono">
                                                     IP: {dev.ipaddress || "127.0.0.1"}
                                                 </span>
                                             </div>
                                         </div>
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300">
                                             Trusted
                                         </span>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600 dark:text-gray-400 pt-1 border-t border-gray-200/60 dark:border-zinc-700/60">
+                                    <div className="grid grid-cols-2 gap-2 text-[11px] text-zinc-600 dark:text-zinc-400 pt-1 border-t border-zinc-200 dark:border-zinc-700">
                                         <div>
-                                            <span className="text-gray-400 block text-[10px]">Location</span>
+                                            <span className="text-zinc-400 block text-[10px]">Location</span>
                                             <span>{dev.location || `${dev.city || "Bengaluru"}, ${dev.country || "India"}`}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-400 block text-[10px]">Trusted Until</span>
+                                            <span className="text-zinc-400 block text-[10px]">Trusted Until</span>
                                             <span>
                                                 {dev.expiresat
                                                     ? format(new Date(dev.expiresat), "MMM d, yyyy")
@@ -412,7 +412,7 @@ export default function AccountSecurityContent() {
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleRevokeDevice(dev.deviceid)}
-                                    className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 w-full justify-center"
+                                    className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 w-full justify-center cursor-pointer"
                                 >
                                     <Trash2 className="w-3.5 h-3.5 mr-1.5" />
                                     Revoke Trust
@@ -424,13 +424,13 @@ export default function AccountSecurityContent() {
             </div>
 
             {/* 3. Detailed Security Login History Audit Log */}
-            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-gray-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
-                <div className="space-y-1 border-b border-gray-100 dark:border-zinc-800 pb-4">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
+                <div className="space-y-1 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
                         Detailed Login History & Security Audit Log
                     </h2>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-zinc-500">
                         Complete chronological record of login timestamps, IP addresses, browsers, OS, and verification status.
                     </p>
                 </div>

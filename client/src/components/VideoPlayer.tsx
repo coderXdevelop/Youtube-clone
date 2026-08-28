@@ -72,6 +72,8 @@ export default function VideoPlayer({
   const [resumeNotice, setResumeNotice] = useState<{ position: number; visible: boolean } | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [speedNotice, setSpeedNotice] = useState<string | null>(null);
+  const [volumeNotice, setVolumeNotice] = useState<string | null>(null);
+  const volumeNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const lastClickTimeRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
@@ -155,23 +157,62 @@ export default function VideoPlayer({
   }, []);
 
   // 6. Volume & Mute handling
-  const handleVolumeChange = useCallback((newVol: number) => {
+  const volumePressTrackerRef = useRef<{ lastTime: number; direction: "up" | "down" | null; streak: number }>({
+    lastTime: 0,
+    direction: null,
+    streak: 0,
+  });
+
+  const handleVolumeChange = useCallback((newVol: number, showNotice = false) => {
     const v = videoRef.current;
     if (!v) return;
-    const clamped = Math.max(0, Math.min(1, newVol));
+    const clamped = Math.max(0, Math.min(1, Math.round(newVol * 100) / 100));
     v.volume = clamped;
     setVolume(clamped);
     if (clamped > 0 && isMuted) {
       v.muted = false;
       setIsMuted(false);
     }
+    if (showNotice) {
+      setVolumeNotice(`${Math.round(clamped * 100)}%`);
+      if (volumeNoticeTimeoutRef.current) clearTimeout(volumeNoticeTimeoutRef.current);
+      volumeNoticeTimeoutRef.current = setTimeout(() => setVolumeNotice(null), 1200);
+    }
   }, [isMuted]);
+
+  const adjustVolume = useCallback((direction: "up" | "down") => {
+    const now = Date.now();
+    const tracker = volumePressTrackerRef.current;
+    const timeDiff = now - tracker.lastTime;
+
+    // Detect rapid successive clicking (within 350ms)
+    if (tracker.direction === direction && timeDiff < 350) {
+      tracker.streak = Math.min(8, tracker.streak + 1);
+    } else {
+      tracker.streak = 0;
+    }
+    tracker.lastTime = now;
+    tracker.direction = direction;
+
+    // Single click increases by const 5 units (0.05).
+    // Rapid successive presses accelerate exponentially (e.g. 5% -> 8% -> 12% -> 18% -> 27% -> 35%)
+    const exponentialMultiplier = Math.pow(1.5, tracker.streak);
+    const step = Math.min(0.35, 0.05 * exponentialMultiplier);
+
+    const v = videoRef.current;
+    const currentVol = v ? v.volume : volume;
+    const targetVol = direction === "up" ? currentVol + step : currentVol - step;
+    handleVolumeChange(targetVol, true);
+  }, [handleVolumeChange, volume]);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     v.muted = !isMuted;
     setIsMuted(!isMuted);
+    setVolumeNotice(!isMuted ? "Muted" : `${Math.round(v.volume * 100)}%`);
+    if (volumeNoticeTimeoutRef.current) clearTimeout(volumeNoticeTimeoutRef.current);
+    volumeNoticeTimeoutRef.current = setTimeout(() => setVolumeNotice(null), 1200);
   }, [isMuted]);
 
   // 7. Playback Speed Change
@@ -428,11 +469,11 @@ export default function VideoPlayer({
           break;
         case "arrowup":
           e.preventDefault();
-          handleVolumeChange(volume + 0.1);
+          adjustVolume("up");
           break;
         case "arrowdown":
           e.preventDefault();
-          handleVolumeChange(volume - 0.1);
+          adjustVolume("down");
           break;
         case "m":
           e.preventDefault();
@@ -493,8 +534,7 @@ export default function VideoPlayer({
   }, [
     togglePlay,
     seekRelative,
-    handleVolumeChange,
-    volume,
+    adjustVolume,
     toggleMute,
     toggleFullscreen,
     onToggleTheater,
@@ -599,6 +639,14 @@ export default function VideoPlayer({
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/85 border border-zinc-700/80 backdrop-blur-md text-white font-semibold text-sm px-4 py-1.5 rounded-full shadow-2xl z-20 pointer-events-none animate-in fade-in zoom-in-90 duration-150 flex items-center gap-1.5">
           <span className="text-zinc-400 text-xs uppercase tracking-wide">Speed</span>
           <span className="text-red-500 font-bold">{speedNotice}</span>
+        </div>
+      )}
+
+      {/* Volume Level HUD Notice */}
+      {volumeNotice && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/85 border border-zinc-700/80 backdrop-blur-md text-white font-semibold text-sm px-4 py-1.5 rounded-full shadow-2xl z-20 pointer-events-none animate-in fade-in zoom-in-90 duration-150 flex items-center gap-2">
+          <span className="text-zinc-400 text-xs uppercase tracking-wide">Volume</span>
+          <span className="text-white font-bold">{volumeNotice}</span>
         </div>
       )}
 
