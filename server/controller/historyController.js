@@ -82,3 +82,95 @@ export const deleteHistoryItem = async (req, res) => {
         return res.status(500).json({ message: "Failed to remove history item." });
     }
 };
+
+/**
+ * Save or update watch progress for a user on a specific video
+ * POST /api/history/progress/:videoId
+ * Body: { userId, position, duration }
+ */
+export const updateWatchProgress = async (req, res) => {
+    const { videoId } = req.params;
+    const { userId, position = 0, duration = 0 } = req.body;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: "Valid userId is required" });
+    }
+    if (!videoId || !mongoose.Types.ObjectId.isValid(videoId)) {
+        return res.status(400).json({ message: "Valid videoId is required" });
+    }
+
+    try {
+        const numPosition = Number(position) || 0;
+        const numDuration = Number(duration) || 0;
+        const watchPercentage = numDuration > 0 ? Math.min(100, Math.round((numPosition / numDuration) * 100)) : 0;
+        const isCompleted = watchPercentage >= 90;
+
+        let record = await history.findOne({ viewer: userId, videoid: videoId });
+        if (record) {
+            record.lastPosition = numPosition;
+            record.duration = numDuration;
+            record.watchPercentage = Math.max(record.watchPercentage || 0, watchPercentage);
+            record.completed = record.completed || isCompleted;
+            await record.save();
+        } else {
+            record = await history.create({
+                viewer: userId,
+                videoid: videoId,
+                lastPosition: numPosition,
+                duration: numDuration,
+                watchPercentage,
+                completed: isCompleted,
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            progress: {
+                lastPosition: record.lastPosition,
+                duration: record.duration,
+                watchPercentage: record.watchPercentage,
+                completed: record.completed,
+            },
+        });
+    } catch (error) {
+        console.error("updateWatchProgress error:", error);
+        return res.status(500).json({ message: "Failed to update watch progress" });
+    }
+};
+
+/**
+ * Get watch progress for a video and user
+ * GET /api/history/progress/:userId/:videoId
+ */
+export const getWatchProgress = async (req, res) => {
+    const { userId, videoId } = req.params;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: "Valid userId is required" });
+    }
+    if (!videoId || !mongoose.Types.ObjectId.isValid(videoId)) {
+        return res.status(400).json({ message: "Valid videoId is required" });
+    }
+
+    try {
+        const record = await history.findOne({ viewer: userId, videoid: videoId });
+        if (!record) {
+            return res.status(200).json({
+                lastPosition: 0,
+                duration: 0,
+                completed: false,
+                watchPercentage: 0,
+            });
+        }
+
+        return res.status(200).json({
+            lastPosition: record.lastPosition || 0,
+            duration: record.duration || 0,
+            completed: !!record.completed,
+            watchPercentage: record.watchPercentage || 0,
+        });
+    } catch (error) {
+        console.error("getWatchProgress error:", error);
+        return res.status(500).json({ message: "Failed to get watch progress" });
+    }
+};

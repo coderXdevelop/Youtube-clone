@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
+import { getMediaUrl } from "@/lib/playerUtils";
 import DownloadQuotaModal from "./DownloadQuotaModal";
 
 interface DownloadedVideoItem {
@@ -247,9 +248,7 @@ export default function DownloadsContent() {
                             const videoTitle = item.videotitle || videoObj?.videotitle || "Video";
                             const channel = videoObj?.videochanel || "Channel";
                             const thumbnail = item.thumbnailpath || videoObj?.thumbnailpath || "";
-                            const thumbUrl = thumbnail
-                                ? `${backendUrl}/${thumbnail.replace(/^\/+/, "")}`
-                                : "/placeholder.svg";
+                            const thumbUrl = getMediaUrl(thumbnail) || "/placeholder.svg";
 
                             return (
                                 <div

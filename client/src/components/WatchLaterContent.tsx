@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
+import { getMediaUrl } from "@/lib/playerUtils";
 
 interface WatchLaterItem {
     _id: string;
@@ -111,10 +112,8 @@ export default function WatchLaterContent() {
                     const videoObj = item.videoid;
                     if (!videoObj) return null;
 
-                    const thumbUrl = videoObj.thumbnailpath
-                        ? `${backendUrl}/${videoObj.thumbnailpath.replace(/^\/+/, "")}`
-                        : "";
-                    const videoSrc = `${backendUrl}/${videoObj.filepath || ""}#t=0.5`;
+                    const thumbUrl = getMediaUrl(videoObj.thumbnailpath);
+                    const videoSrc = `${getMediaUrl(videoObj.filepath)}#t=0.5`;
 
                     return (
                         <div key={item._id} className="flex gap-4 group items-start">

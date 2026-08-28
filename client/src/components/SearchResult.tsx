@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useEffect, useState } from "react";
 import axiosInstance from "@/lib/AxiosInstance";
 import { Video } from "./VideoCard";
+import { getMediaUrl } from "@/lib/playerUtils";
 
 interface SearchResultProps {
   query: string;
@@ -99,10 +100,8 @@ const SearchResult = ({ query }: SearchResultProps) => {
       {/* Video Results */}
       <div className="space-y-4">
         {matchingVideos.map((item: Video) => {
-          const thumbUrl = item.thumbnailpath
-            ? `${backendUrl}/${item.thumbnailpath.replace(/^\/+/, "")}`
-            : "";
-          const videoSrc = `${backendUrl}/${item.filepath}#t=0.5`;
+          const thumbUrl = getMediaUrl(item.thumbnailpath);
+          const videoSrc = `${getMediaUrl(item.filepath)}#t=0.5`;
 
           return (
             <div key={item._id} className="flex flex-col sm:flex-row gap-4 group">

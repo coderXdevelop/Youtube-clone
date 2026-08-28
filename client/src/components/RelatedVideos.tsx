@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { getMediaUrl } from "@/lib/playerUtils";
 import { Video } from "./VideoCard";
 
 interface RelatedVideosProps {
@@ -17,7 +18,6 @@ export default function RelatedVideos({
   currentCategory,
   currentChannel,
 }: RelatedVideosProps) {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
   // Filter out current video
   const otherVideos = (videos || []).filter((v) => v._id !== currentVideoId);
@@ -57,10 +57,8 @@ export default function RelatedVideos({
         Related Videos
       </h3>
       {sortedVideos.map((video) => {
-        const thumbUrl = video.thumbnailpath
-          ? `${backendUrl}/${video.thumbnailpath.replace(/^\/+/, "")}`
-          : "";
-        const videoSrc = `${backendUrl}/${video.filepath}#t=0.5`;
+        const thumbUrl = getMediaUrl(video.thumbnailpath);
+        const videoSrc = `${getMediaUrl(video.filepath)}#t=0.5`;
 
         return (
           <Link

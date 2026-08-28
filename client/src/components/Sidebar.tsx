@@ -10,7 +10,6 @@ import {
     User,
     Download,
     ShieldCheck,
-    CreditCard,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import React, { useState } from "react";
@@ -87,13 +86,6 @@ const Sidebar = () => {
                     >
                         <ShieldCheck className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                         <span>Security</span>
-                    </Link>
-                    <Link
-                        href="/checkout"
-                        className="flex items-center gap-5 px-3 py-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-xl text-gray-800 dark:text-gray-200 text-sm font-normal transition-colors"
-                    >
-                        <CreditCard className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-                        <span>Checkout</span>
                     </Link>
 
                     {user?.channelname ? (

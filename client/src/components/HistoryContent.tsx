@@ -13,10 +13,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
+import { getMediaUrl } from "@/lib/playerUtils";
 
 interface HistoryItem {
   _id: string;
   createdAt: string;
+  lastPosition?: number;
+  duration?: number;
+  completed?: boolean;
+  watchPercentage?: number;
   videoid: {
     _id: string;
     videotitle: string;
@@ -119,10 +124,8 @@ export default function HistoryContent() {
           const videoObj = item.videoid;
           if (!videoObj) return null;
 
-          const thumbUrl = videoObj.thumbnailpath
-            ? `${backendUrl}/${videoObj.thumbnailpath.replace(/^\/+/, "")}`
-            : "";
-          const videoSrc = `${backendUrl}/${videoObj.filepath || ""}#t=0.5`;
+          const thumbUrl = getMediaUrl(videoObj.thumbnailpath);
+          const videoSrc = `${getMediaUrl(videoObj.filepath)}#t=0.5`;
 
           return (
             <div key={item._id} className="flex gap-4 group items-start">
@@ -141,6 +144,14 @@ export default function HistoryContent() {
                       preload="metadata"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
+                  )}
+                  {item.watchPercentage !== undefined && item.watchPercentage > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+                      <div
+                        className="h-full bg-red-600 rounded-r-full"
+                        style={{ width: `${Math.min(100, Math.max(5, item.watchPercentage))}%` }}
+                      />
+                    </div>
                   )}
                 </div>
               </Link>

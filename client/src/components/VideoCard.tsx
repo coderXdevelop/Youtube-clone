@@ -4,6 +4,8 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 
+import { getMediaUrl } from "@/lib/playerUtils";
+
 export interface Video {
   _id: string;
   videotitle: string;
@@ -25,11 +27,8 @@ export interface VideoCardProps {
 }
 
 export default function VideoCard({ video }: VideoCardProps) {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
-  const thumbUrl = video?.thumbnailpath
-    ? `${backendUrl}/${video.thumbnailpath.replace(/^\/+/, "")}`
-    : "";
-  const videoSrc = `${backendUrl}/${video?.filepath}#t=0.5`;
+  const thumbUrl = getMediaUrl(video?.thumbnailpath);
+  const videoSrc = `${getMediaUrl(video?.filepath)}#t=0.5`;
 
   return (
     <Link href={`/watch/${video?._id}`} className="group block">

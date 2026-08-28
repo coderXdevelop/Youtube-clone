@@ -12,6 +12,10 @@ const historyschema = mongoose.Schema(
             required: true,
         },
         likedon: { type: Date, default: Date.now },
+        lastPosition: { type: Number, default: 0 },
+        duration: { type: Number, default: 0 },
+        completed: { type: Boolean, default: false },
+        watchPercentage: { type: Number, default: 0 },
     },
     {
         timestamps: true,
