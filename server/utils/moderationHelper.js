@@ -25,33 +25,9 @@ const SUSPICIOUS_URL_PATTERNS = [
 ];
 
 // In-memory rate limiting and CAPTCHA challenge storage
-// userRateLimits: { [key: string]: number[] } (timestamps of recent posts)
 const userRateLimits = new Map();
-// recentComments: { [userId: string]: { text: string, time: number }[] }
 const recentComments = new Map();
-// captchaChallenges: { [token: string]: { answer: string, expiresAt: number } }
 const captchaChallenges = new Map();
-
-// Clean expired memory records every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    // Clean rate limits
-    for (const [key, timestamps] of userRateLimits.entries()) {
-        const valid = timestamps.filter((t) => now - t < 60000);
-        if (valid.length === 0) userRateLimits.delete(key);
-        else userRateLimits.set(key, valid);
-    }
-    // Clean recent comments (keep within 10 minutes)
-    for (const [key, list] of recentComments.entries()) {
-        const valid = list.filter((item) => now - item.time < 600000);
-        if (valid.length === 0) recentComments.delete(key);
-        else recentComments.set(key, valid);
-    }
-    // Clean captcha challenges
-    for (const [token, data] of captchaChallenges.entries()) {
-        if (now > data.expiresAt) captchaChallenges.delete(token);
-    }
-}, 300000);
 
 /**
  * Checks if comment body contains profanity or abusive language

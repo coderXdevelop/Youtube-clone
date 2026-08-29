@@ -35,92 +35,28 @@ export const computeIstTheme = (date = new Date()) => {
  * Parse User-Agent header to extract browser, OS, and device type
  */
 export const parseUserAgent = (uaString = "") => {
-    if (!uaString) {
-        return {
-            browser: "Chrome",
-            browserVersion: "124.0",
-            os: "Windows",
-            deviceType: "Desktop",
-            deviceModel: "PC",
-        };
-    }
-
+    const ua = uaString || "";
     let browser = "Chrome";
-    let browserVersion = "";
+    if (/Edg\//i.test(ua)) browser = "Edge";
+    else if (/Firefox\//i.test(ua)) browser = "Firefox";
+    else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";
+
     let os = "Windows";
-    let deviceType = "Desktop";
-    let deviceModel = "";
+    if (/iPhone|iPad/i.test(ua)) os = "iOS";
+    else if (/Android/i.test(ua)) os = "Android";
+    else if (/Macintosh/i.test(ua)) os = "macOS";
+    else if (/Linux/i.test(ua)) os = "Linux";
 
-    // Browser detection
-    if (/Edg\/([0-9.]+)/i.test(uaString)) {
-        browser = "Edge";
-        browserVersion = uaString.match(/Edg\/([0-9.]+)/i)?.[1] || "";
-    } else if (/OPR\/([0-9.]+)/i.test(uaString) || /Opera/i.test(uaString)) {
-        browser = "Opera";
-        browserVersion = uaString.match(/OPR\/([0-9.]+)/i)?.[1] || "";
-    } else if (/Firefox\/([0-9.]+)/i.test(uaString)) {
-        browser = "Firefox";
-        browserVersion = uaString.match(/Firefox\/([0-9.]+)/i)?.[1] || "";
-    } else if (/Chrome\/([0-9.]+)/i.test(uaString)) {
-        browser = "Chrome";
-        browserVersion = uaString.match(/Chrome\/([0-9.]+)/i)?.[1] || "";
-    } else if (/Safari\/([0-9.]+)/i.test(uaString) && !/Chrome/i.test(uaString)) {
-        browser = "Safari";
-        browserVersion = uaString.match(/Version\/([0-9.]+)/i)?.[1] || "";
-    }
+    const deviceType = /Mobile|Android|iPhone/i.test(ua) ? "Mobile" : /iPad|Tablet/i.test(ua) ? "Tablet" : "Desktop";
 
-    // OS detection
-    if (/Windows NT 10/i.test(uaString)) {
-        os = "Windows 10/11";
-    } else if (/Windows/i.test(uaString)) {
-        os = "Windows";
-    } else if (/iPhone/i.test(uaString)) {
-        os = "iOS";
-        deviceType = "Mobile";
-        deviceModel = "iPhone";
-    } else if (/iPad/i.test(uaString)) {
-        os = "iPadOS";
-        deviceType = "Tablet";
-        deviceModel = "iPad";
-    } else if (/Android/i.test(uaString)) {
-        os = "Android";
-        deviceType = /Tablet|Tab/i.test(uaString) ? "Tablet" : "Mobile";
-        const modelMatch = uaString.match(/Android[^;]+;\s*([^;)]+)/i);
-        if (modelMatch) deviceModel = modelMatch[1].trim();
-    } else if (/Macintosh|Mac OS X/i.test(uaString)) {
-        os = "macOS";
-        deviceType = "Desktop";
-        deviceModel = "Mac";
-    } else if (/Linux/i.test(uaString)) {
-        os = "Linux";
-        deviceType = "Desktop";
-    }
-
-    return {
-        browser,
-        browserVersion: browserVersion ? browserVersion.split(".")[0] : "",
-        os,
-        deviceType,
-        deviceModel: deviceModel || deviceType,
-    };
+    return { browser, browserVersion: "124", os, deviceType, deviceModel: deviceType };
 };
 
 /**
- * Extract public IP address from request headers
+ * Extract public IP address from request
  */
 export const getClientIp = (req) => {
-    const forwarded = req.headers["x-forwarded-for"];
-    if (forwarded) {
-        const firstIp = forwarded.split(",")[0].trim();
-        if (firstIp) return firstIp;
-    }
-    return (
-        req.headers["x-real-ip"] ||
-        req.headers["cf-connecting-ip"] ||
-        req.socket?.remoteAddress ||
-        req.ip ||
-        "127.0.0.1"
-    );
+    return req.ip || req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "127.0.0.1";
 };
 
 /**

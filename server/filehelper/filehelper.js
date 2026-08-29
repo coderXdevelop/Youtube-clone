@@ -1,16 +1,8 @@
 "use strict";
 import multer from "multer";
-import fs from "fs";
-
-const uploadDir = "uploads";
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
+    destination: "uploads",
     filename: (req, file, cb) => {
         const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
         cb(
@@ -21,11 +13,7 @@ const storage = multer.diskStorage({
 });
 
 const filefilter = (req, file, cb) => {
-    if (file.mimetype.startsWith("video/") || file.mimetype.startsWith("image/")) {
-        cb(null, true);
-    } else {
-        cb(null, false);
-    }
+    cb(null, file.mimetype.startsWith("video/") || file.mimetype.startsWith("image/"));
 };
 
 const upload = multer({ storage: storage, fileFilter: filefilter });

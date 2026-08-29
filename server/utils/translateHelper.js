@@ -27,79 +27,24 @@ export const SUPPORTED_LANGUAGES = [
  */
 export const translateText = async (text, targetLang = "en", sourceLang = "auto") => {
     if (!text || !text.trim()) {
-        return { translatedText: text, detectedSourceLang: sourceLang };
+        return { translatedText: text, detectedSourceLang: sourceLang, targetLang };
     }
 
     const cleanText = text.trim();
-
-    // Attempt 1: Google Translate auto-detect engine (Primary, highly accurate for all scripts & Latin languages)
     try {
         const gUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang || "auto"}&tl=${targetLang}&dt=t&q=${encodeURIComponent(cleanText)}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-        const response = await fetch(gUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
+        const response = await fetch(gUrl, { signal: AbortSignal.timeout(5000) });
         if (response.ok) {
             const data = await response.json();
-            if (Array.isArray(data?.[0])) {
-                const combined = data[0]
-                    .filter((segment) => Array.isArray(segment) && segment[0])
-                    .map((segment) => segment[0])
-                    .join("");
-
-                const detected = data[2] || "auto";
-
-                if (combined) {
-                    return {
-                        translatedText: combined,
-                        detectedSourceLang: detected,
-                        targetLang,
-                    };
-                }
-            }
+            const translatedText = data?.[0]?.map((s) => s?.[0]).filter(Boolean).join("") || cleanText;
+            const detectedSourceLang = data?.[2] || sourceLang;
+            return { translatedText, detectedSourceLang, targetLang };
         }
     } catch (err) {
-        console.warn("Google Translate engine attempt failed, trying MyMemory fallback:", err.message);
+        console.warn("Translation service unavailable:", err.message);
     }
 
-    // Attempt 2: MyMemory Translation API fallback
-    try {
-        const langPair = sourceLang === "auto" ? `autodetect|${targetLang}` : `${sourceLang}|${targetLang}`;
-        const encodedText = encodeURIComponent(cleanText);
-        const url = `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=${langPair}`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-        const response = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-            const data = await response.json();
-            if (data?.responseData?.translatedText) {
-                const translated = data.responseData.translatedText;
-                if (translated && !translated.startsWith("MYMEMORY WARNING:")) {
-                    return {
-                        translatedText: translated,
-                        detectedSourceLang: data.responseData.detectedLanguage || sourceLang,
-                        targetLang,
-                    };
-                }
-            }
-        }
-    } catch (err) {
-        console.warn("MyMemory fallback failed:", err.message);
-    }
-
-    // Graceful fallback: return original text if both translation services fail
-    return {
-        translatedText: cleanText,
-        detectedSourceLang: sourceLang,
-        targetLang,
-        fallback: true,
-    };
+    return { translatedText: cleanText, detectedSourceLang: sourceLang, targetLang, fallback: true };
 };
 
 /**
