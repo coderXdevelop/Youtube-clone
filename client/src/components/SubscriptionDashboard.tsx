@@ -157,6 +157,24 @@ export default function SubscriptionDashboard() {
         }
     };
 
+    const handleResetSubscription = async () => {
+        if (!user?._id) return;
+        if (!confirm("Are you sure you want to reset your subscription back to the Free plan?")) {
+            return;
+        }
+
+        try {
+            const res = await axiosInstance.post("/api/subscription/reset", { userId: user._id });
+            if (res.data?.success) {
+                setFeedbackMessage(res.data.message);
+                loadSubscriptionData();
+            }
+        } catch (err) {
+            console.error("Reset subscription error:", err);
+            alert("Failed to reset subscription.");
+        }
+    };
+
     const handleViewPastInvoice = (item: TransactionItem) => {
         const invoicePayload: InvoiceData = {
             invoiceNumber: item.invoicenumber,
@@ -235,25 +253,47 @@ export default function SubscriptionDashboard() {
                                         {format(new Date(userSub.expiresAt), "MMM d, yyyy")}
                                     </span>
                                 </div>
-                                {userSub.status === "cancelled" ? (
-                                    <span className="inline-block text-[11px] text-zinc-400 font-medium">
-                                        Auto-renewal cancelled (access valid till expiry)
-                                    </span>
-                                ) : (
+                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-700/60">
+                                    {userSub.status === "cancelled" ? (
+                                        <span className="inline-block text-[11px] text-zinc-400 font-medium">
+                                            Auto-renewal cancelled
+                                        </span>
+                                    ) : (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleCancelSubscription}
+                                            className="h-6 px-0 text-[11px] text-zinc-400 hover:text-white hover:bg-transparent"
+                                        >
+                                            Cancel
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={handleCancelSubscription}
-                                        className="h-6 px-0 text-[11px] text-zinc-400 hover:text-white hover:bg-transparent"
+                                        onClick={handleResetSubscription}
+                                        className="h-6 px-0 text-[11px] text-red-400 hover:text-red-300 hover:bg-transparent"
                                     >
-                                        Cancel Subscription
+                                        Reset to Free
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 border-t border-zinc-700 pt-2">
+                                <p className="text-xs text-zinc-400 leading-relaxed">
+                                    Upgrade today to download more videos daily and stream in Full HD without ads.
+                                </p>
+                                {user?._id && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleResetSubscription}
+                                        className="h-6 px-0 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-transparent"
+                                    >
+                                        Reset Subscription Data
                                     </Button>
                                 )}
                             </div>
-                        ) : (
-                            <p className="text-xs text-zinc-400 leading-relaxed border-t border-zinc-700 pt-2">
-                                Upgrade today to download more videos daily and stream in Full HD without ads.
-                            </p>
                         )}
                     </div>
                 </div>

@@ -11,6 +11,7 @@ import {
     generateOtp,
     maskEmail,
 } from "../utils/securityUtils.js";
+import { sendSecurityOtpEmail } from "../utils/emailService.js";
 
 /**
  * Enhanced Login Controller with:
@@ -210,6 +211,21 @@ export const login = async (req, res) => {
             });
 
             console.log(`[SECURITY] OTP Challenge generated for ${email}: ${otpCode} (Reason: ${reasonString})`);
+
+            // Dispatch transactional security OTP email via Brevo
+            sendSecurityOtpEmail({
+                toEmail: email,
+                userName: existingUser.name || email.split("@")[0],
+                otpCode,
+                reason: reasonString,
+                deviceInfo: {
+                    browser: uaMeta.browser,
+                    os: uaMeta.os,
+                    deviceType: uaMeta.deviceType,
+                    ip: ipAddress,
+                    location: `${locationMeta.city}, ${locationMeta.state}, ${locationMeta.country}`,
+                },
+            }).catch((err) => console.warn("Background OTP email dispatch warning:", err.message));
 
             return res.status(200).json({
                 requiresOtp: true,

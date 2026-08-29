@@ -61,6 +61,15 @@ export const UploadVideo = async (req, res) => {
         const description = req.body.videodescription || req.body.description || "";
         const category = req.body.category || "All";
 
+        const uploaderId = req.body.uploader || "";
+        let uploaderImage = "";
+        if (uploaderId && mongoose.Types.ObjectId.isValid(uploaderId)) {
+            const uploaderUser = await user.findById(uploaderId);
+            if (uploaderUser) {
+                uploaderImage = uploaderUser.image || "";
+            }
+        }
+
         const newVideo = new video({
             videotitle: req.body.videotitle,
             videodescription: description,
@@ -71,7 +80,9 @@ export const UploadVideo = async (req, res) => {
             filetype: videoFile.mimetype,
             filesize: String(videoFile.size),
             videochanel: req.body.videochanel || "My Channel",
-            uploader: req.body.uploader || "",
+            uploader: uploaderId,
+            uploaderimage: uploaderImage,
+            channelimage: uploaderImage,
             thumbnailpath: thumbnailPath,
             thumbnailfilename: thumbnailFilename,
         });
@@ -89,8 +100,44 @@ export const UploadVideo = async (req, res) => {
 
 export const getallvideo = async (req, res) => {
     try {
-        const files = await video.find().sort({ createdAt: -1 });
-        return res.status(200).send(files);
+        const files = await video.find().sort({ createdAt: -1 }).lean();
+
+        // Enrich videos with channel/uploader profile avatar image
+        const uploaderIds = files.map((f) => f.uploader).filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+        const channelNames = files.map((f) => f.videochanel).filter(Boolean);
+
+        const matchingUsers = await user
+            .find({
+                $or: [
+                    { _id: { $in: uploaderIds } },
+                    { channelname: { $in: channelNames } },
+                    { name: { $in: channelNames } },
+                ],
+            })
+            .lean();
+
+        const userMap = new Map();
+        matchingUsers.forEach((u) => {
+            userMap.set(String(u._id), u);
+            if (u.channelname) userMap.set(u.channelname.toLowerCase(), u);
+            if (u.name) userMap.set(u.name.toLowerCase(), u);
+        });
+
+        const enrichedFiles = files.map((file) => {
+            const matchedUser =
+                userMap.get(String(file.uploader)) ||
+                userMap.get((file.videochanel || "").toLowerCase());
+
+            const userImg = matchedUser?.image || file.uploaderimage || file.channelimage || "";
+            return {
+                ...file,
+                uploaderimage: userImg,
+                channelimage: userImg,
+                userimage: userImg,
+            };
+        });
+
+        return res.status(200).send(enrichedFiles);
     } catch (error) {
         console.error("getallvideo error:", error);
         return res.status(500).json({ message: "Something went wrong fetching videos." });

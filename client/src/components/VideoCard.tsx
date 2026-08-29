@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 import { getMediaUrl } from "@/lib/playerUtils";
 
@@ -20,6 +20,9 @@ export interface Video {
   thumbnailpath?: string;
   Like?: number;
   Dislike?: number;
+  uploaderimage?: string;
+  channelimage?: string;
+  userimage?: string;
 }
 
 export interface VideoCardProps {
@@ -29,6 +32,9 @@ export interface VideoCardProps {
 export default function VideoCard({ video }: VideoCardProps) {
   const thumbUrl = getMediaUrl(video?.thumbnailpath);
   const videoSrc = `${getMediaUrl(video?.filepath)}#t=0.5`;
+
+  const channelImg = video?.channelimage || video?.uploaderimage || video?.userimage || "";
+  const channelImgUrl = channelImg ? getMediaUrl(channelImg) : "";
 
   return (
     <Link href={`/watch/${video?._id}`} className="group block">
@@ -55,6 +61,9 @@ export default function VideoCard({ video }: VideoCardProps) {
 
         <div className="flex gap-3">
           <Avatar className="w-9 h-9 shrink-0 ring-1 ring-black/5">
+            {channelImgUrl && (
+              <AvatarImage src={channelImgUrl} alt={video?.videochanel || "Channel avatar"} />
+            )}
             <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold">
               {video?.videochanel ? video.videochanel[0]?.toUpperCase() : "?"}
             </AvatarFallback>

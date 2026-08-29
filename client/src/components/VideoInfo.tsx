@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import { getMediaUrl } from "@/lib/playerUtils";
 import {
   Clock,
   Download,
@@ -49,6 +50,28 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     nextResetTime?: string;
   } | null>(null);
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
+
+  const initialImg = video?.channelimage || video?.uploaderimage || video?.userimage || "";
+  const [channelImg, setChannelImg] = useState<string>(initialImg);
+
+  useEffect(() => {
+    const currentImg = video?.channelimage || video?.uploaderimage || video?.userimage;
+    if (currentImg) {
+      setChannelImg(currentImg);
+      return;
+    }
+    if (video.uploader) {
+      axiosInstance.get(`/api/user/getuserprofile/${video.uploader}`)
+        .then(res => {
+          if (res.data?.image) {
+            setChannelImg(res.data.image);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [video]);
+
+  const channelImgUrl = channelImg ? getMediaUrl(channelImg) : "";
 
   // const user: any = {
   //   id: "1",
@@ -253,6 +276,9 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 shrink-0">
           <Avatar className="w-10 h-10 shrink-0">
+            {channelImgUrl && (
+              <AvatarImage src={channelImgUrl} alt={video.videochanel || "Channel avatar"} />
+            )}
             <AvatarFallback className="font-semibold">{video.videochanel ? video.videochanel[0]?.toUpperCase() : "C"}</AvatarFallback>
           </Avatar>
           <div>

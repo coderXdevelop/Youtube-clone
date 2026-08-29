@@ -30,6 +30,7 @@ import { useUser } from "@/lib/AuthContext";
 import CommentReportDialog from "./CommentReportDialog";
 import CommentHistoryDialog from "./CommentHistoryDialog";
 import axios from "axios";
+import { getMediaUrl } from "@/lib/playerUtils";
 
 export interface CommentData {
     _id: string;
@@ -348,12 +349,15 @@ const CommentItem = ({
     };
 
     const remainingMinutes = Math.ceil(timeLeftMs / 60000);
+    const userImgUrl = comment.userimage ? getMediaUrl(comment.userimage) : "";
 
     return (
         <div className="flex gap-3 text-gray-900 dark:text-gray-100 group transition-colors">
             {/* User Avatar */}
             <Avatar className="w-9 h-9 shrink-0 ring-1 ring-black/5 dark:ring-white/10">
-                <AvatarImage src={comment.userimage || "/placeholder.svg"} />
+                {userImgUrl && (
+                    <AvatarImage src={userImgUrl} alt={comment.usercommented || "User avatar"} />
+                )}
                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold">
                     {comment.isdeleted ? "—" : (comment.usercommented?.[0]?.toUpperCase() || "U")}
                 </AvatarFallback>

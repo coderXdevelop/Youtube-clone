@@ -86,9 +86,7 @@ const PaymentCheckoutModal = ({
             }
 
             const { orderId, keyId, amountInPaise } = orderRes.data;
-            const activeKeyId =
-                keyId ||
-                process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+            const activeKeyId = keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
 
             // 2. Open standard Razorpay Checkout Modal
             if (typeof window !== "undefined" && window.Razorpay) {

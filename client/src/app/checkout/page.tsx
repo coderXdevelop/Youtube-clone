@@ -82,9 +82,7 @@ export default function CheckoutPage() {
             }
 
             const orderId = orderRes.data.order_id || orderRes.data.id;
-            const keyId =
-                orderRes.data.key_id ||
-                process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+            const keyId = orderRes.data.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
 
             // STEP 2: FRONTEND - Launch Razorpay Standard Checkout
             if (typeof window !== "undefined" && window.Razorpay) {

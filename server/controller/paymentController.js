@@ -1,20 +1,10 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
-
-// Helper to get Razorpay credentials from environment variables
-const getRazorpayCredentials = () => {
-    const keyId =
-        process.env.RAZORPAY_KEY_ID
-
-    const keySecret =
-        process.env.RAZORPAY_KEY_SECRET
-
-    return { keyId, keySecret };
-};
+import config from "../config/env.js";
 
 // Initialize Razorpay SDK instance
 const getRazorpayInstance = () => {
-    const { keyId, keySecret } = getRazorpayCredentials();
+    const { keyId, keySecret } = config.razorpay;
     if (!keyId || !keySecret) {
         return null;
     }
@@ -34,7 +24,7 @@ const getRazorpayInstance = () => {
  */
 export const createOrder = async (req, res) => {
     try {
-        const { keyId, keySecret } = getRazorpayCredentials();
+        const { keyId, keySecret } = config.razorpay;
 
         if (!keyId || !keySecret) {
             return res.status(401).json({
@@ -149,7 +139,7 @@ export const createOrder = async (req, res) => {
  */
 export const verifyPayment = async (req, res) => {
     try {
-        const { keySecret } = getRazorpayCredentials();
+        const { keySecret } = config.razorpay;
 
         if (!keySecret) {
             return res.status(500).json({

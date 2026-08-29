@@ -103,59 +103,64 @@ const SearchResult = ({ query }: SearchResultProps) => {
           const thumbUrl = getMediaUrl(item.thumbnailpath);
           const videoSrc = `${getMediaUrl(item.filepath)}#t=0.5`;
 
-          return (
-            <div key={item._id} className="flex flex-col sm:flex-row gap-4 group">
-              <Link href={`/watch/${item._id}`} className="shrink-0">
-                <div className="relative w-full sm:w-80 aspect-video bg-black/90 rounded-xl overflow-hidden shadow-sm">
-                  {thumbUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={thumbUrl}
-                      alt={item.videotitle}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                  ) : (
-                    <video
-                      src={videoSrc}
-                      preload="metadata"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                  )}
-                  <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[11px] font-medium px-1.5 py-0.5 rounded">
-                    Video
+            const channelImg = item?.channelimage || item?.uploaderimage || item?.userimage || "";
+            const channelImgUrl = channelImg ? getMediaUrl(channelImg) : "";
+
+            return (
+              <div key={item._id} className="flex flex-col sm:flex-row gap-4 group">
+                <Link href={`/watch/${item._id}`} className="shrink-0">
+                  <div className="relative w-full sm:w-80 aspect-video bg-black/90 rounded-xl overflow-hidden shadow-sm">
+                    {thumbUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbUrl}
+                        alt={item.videotitle}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    ) : (
+                      <video
+                        src={videoSrc}
+                        preload="metadata"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    )}
+                    <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[11px] font-medium px-1.5 py-0.5 rounded">
+                      Video
+                    </div>
                   </div>
-                </div>
-              </Link>
-
-              <div className="flex-1 min-w-0 py-1 space-y-1.5">
-                <Link href={`/watch/${item._id}`}>
-                  <h3 className="font-semibold text-base sm:text-lg line-clamp-2 text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                    {item.videotitle}
-                  </h3>
                 </Link>
 
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span>{(item.views || 0).toLocaleString()} views</span>
-                  <span>•</span>
-                  <span>
-                    {item.createdAt ? formatDistanceToNow(new Date(item.createdAt)) : ""} ago
-                  </span>
-                </div>
+                <div className="flex-1 min-w-0 py-1 space-y-1.5">
+                  <Link href={`/watch/${item._id}`}>
+                    <h3 className="font-semibold text-base sm:text-lg line-clamp-2 text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                      {item.videotitle}
+                    </h3>
+                  </Link>
 
-                <Link
-                  href={item.uploader ? `/channel/${item.uploader}` : "#"}
-                  className="flex items-center gap-2 py-0.5 hover:text-blue-600 dark:hover:text-blue-400"
-                >
-                  <Avatar className="w-6 h-6 shrink-0">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback className="text-[10px] bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
-                      {item.videochanel ? item.videochanel[0]?.toUpperCase() : "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    {item.videochanel}
-                  </span>
-                </Link>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{(item.views || 0).toLocaleString()} views</span>
+                    <span>•</span>
+                    <span>
+                      {item.createdAt ? formatDistanceToNow(new Date(item.createdAt)) : ""} ago
+                    </span>
+                  </div>
+
+                  <Link
+                    href={item.uploader ? `/channel/${item.uploader}` : "#"}
+                    className="flex items-center gap-2 py-0.5 hover:text-blue-600 dark:hover:text-blue-400"
+                  >
+                    <Avatar className="w-6 h-6 shrink-0">
+                      {channelImgUrl && (
+                        <AvatarImage src={channelImgUrl} alt={item.videochanel || "Channel"} />
+                      )}
+                      <AvatarFallback className="text-[10px] bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
+                        {item.videochanel ? item.videochanel[0]?.toUpperCase() : "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      {item.videochanel}
+                    </span>
+                  </Link>
 
                 {(item.videodescription || item.description) && (
                   <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">

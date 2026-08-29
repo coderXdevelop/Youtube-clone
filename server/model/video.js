@@ -62,6 +62,14 @@ const videochema = mongoose.Schema(
             type: String,
             default: "",
         },
+        uploaderimage: {
+            type: String,
+            default: "",
+        },
+        channelimage: {
+            type: String,
+            default: "",
+        },
     },
     {
         timestamps: true,

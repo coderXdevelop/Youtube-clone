@@ -2,13 +2,8 @@ import mongoose from "mongoose";
 import crypto from "crypto";
 import User from "../model/user.js";
 import SubscriptionTransaction from "../model/subscriptionTransaction.js";
-
-// Razorpay Credential Helpers (supports API_KEY, SECREAT, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
-const getRazorpayKeyId = () =>
-    process.env.RAZORPAY_KEY_ID
-
-const getRazorpayKeySecret = () =>
-    process.env.RAZORPAY_KEY_SECRET
+import config from "../config/env.js";
+import { sendSubscriptionInvoiceEmail } from "../utils/emailService.js";
 
 // Comprehensive Plan Definitions with features and pricing
 export const SUBSCRIPTION_PLANS = {
@@ -177,7 +172,7 @@ export const getSubscriptionPlans = async (req, res) => {
         return res.status(200).json({
             plans: SUBSCRIPTION_PLANS,
             userSubscription,
-            razorpayKeyId: getRazorpayKeyId(),
+            razorpayKeyId: config.razorpay.keyId,
         });
     } catch (error) {
         console.error("getSubscriptionPlans error:", error);
@@ -219,8 +214,8 @@ export const createRazorpayOrder = async (req, res) => {
         const subscriptionEnd = computeExpiryDate(billingcycle);
         const amountInPaise = Math.round(amount * 100);
 
-        const keyId = getRazorpayKeyId();
-        const keySecret = getRazorpayKeySecret();
+        const keyId = config.razorpay.keyId;
+        const keySecret = config.razorpay.keySecret;
 
         let razorpayOrderId = null;
         if (keyId && keySecret) {
@@ -339,7 +334,7 @@ export const verifySubscriptionPayment = async (req, res) => {
 
         // Validate cryptographic Razorpay Signature if signature was passed from checkout
         const sigToVerify = razorpay_signature || signature;
-        const keySecret = getRazorpayKeySecret();
+        const keySecret = config.razorpay.keySecret;
         if (sigToVerify && keySecret && paymentId) {
             const expectedSignature = crypto
                 .createHmac("sha256", keySecret)
@@ -395,6 +390,21 @@ export const verifySubscriptionPayment = async (req, res) => {
             paymentMethod: transaction.paymentmethod,
             status: "PAID",
         };
+
+        // Dispatch subscription purchase invoice email via Brevo asynchronously
+        if (transaction.useremail) {
+            sendSubscriptionInvoiceEmail({
+                toEmail: transaction.useremail,
+                customerName: transaction.username || updatedUser?.name,
+                invoiceNumber: transaction.invoicenumber,
+                plan: transaction.plan,
+                billingcycle: transaction.billingcycle,
+                amount: transaction.amount,
+                currency: transaction.currency || "INR",
+                paymentId: generatedPaymentId,
+                date: transaction.subscriptionstart,
+            }).catch((err) => console.warn("Background invoice email dispatch warning:", err.message));
+        }
 
         return res.status(200).json({
             success: true,
