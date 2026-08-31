@@ -125,19 +125,20 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
 
     return (
         <>
-            {/* Desktop Sticky Inline Sidebar */}
+            {/* Desktop Sticky Inline Sidebar (Hidden completely when collapsed) */}
             <aside
                 className={cn(
-                    "hidden lg:flex w-56 h-[calc(100vh-3.5rem)] bg-white dark:bg-neutral-900 border-r border-gray-200 dark:border-neutral-800 flex-col py-2 px-3 select-none shrink-0 transition-all overflow-y-auto sticky top-14",
+                    "hidden h-[calc(100vh-3.5rem)] bg-white dark:bg-neutral-900 border-r border-gray-200 dark:border-neutral-800 flex-col py-2 px-3 select-none shrink-0 transition-all duration-200 overflow-y-auto sticky top-14",
+                    isSidebarOpen && "lg:flex w-56",
                     className
                 )}
             >
                 {renderNavLinks()}
             </aside>
 
-            {/* Mobile / Tablet Drawer Overlay */}
+            {/* Mobile / Tablet / Drawer Overlay */}
             {isSidebarOpen && (
-                <div className="lg:hidden fixed inset-0 z-50 flex select-none">
+                <div className={cn("fixed inset-0 z-50 flex select-none", className?.includes("hidden") ? "block" : "lg:hidden")}>
                     {/* Backdrop */}
                     <div
                         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-200"

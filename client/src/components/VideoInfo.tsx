@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { getMediaUrl } from "@/lib/playerUtils";
@@ -50,6 +50,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     nextResetTime?: string;
   } | null>(null);
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
+  const trackedHistoryRef = useRef<string | null>(null);
 
   const initialImg = video?.channelimage || video?.uploaderimage || video?.userimage || "";
   const [channelImg, setChannelImg] = useState<string>(initialImg);
@@ -93,10 +94,18 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     let isMounted = true;
     const handleviewsAndStatus = async () => {
       try {
+        const currentKey = `${user?._id || "guest"}_${video._id}`;
+        const shouldTrackHistory = trackedHistoryRef.current !== currentKey;
+        if (shouldTrackHistory) {
+          trackedHistoryRef.current = currentKey;
+        }
+
         if (user) {
-          await axiosInstance.post(`/api/history/${video._id}`, {
-            userId: user?._id,
-          });
+          if (shouldTrackHistory) {
+            await axiosInstance.post(`/api/history/${video._id}`, {
+              userId: user?._id,
+            });
+          }
 
           // Check if video is already liked by current user
           const likedRes = await axiosInstance.get(`/api/like/${user._id}`);
@@ -119,7 +128,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             );
             setIsWatchLater(isAlreadyWatchLater);
           }
-        } else {
+        } else if (shouldTrackHistory) {
           await axiosInstance.post(`/api/history/views/${video?._id}`);
         }
       } catch (error) {

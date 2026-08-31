@@ -49,10 +49,17 @@ const WatchPage = () => {
         const otherVideos = allVideos.filter((v) => v._id !== id);
         if (otherVideos.length === 0) return null;
 
+        const currentCats = (currentVideo?.category || "")
+            .toLowerCase()
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean);
+
         // Prioritize same category, then same channel
-        const matchedCategory = otherVideos.find(
-            (v) => currentVideo?.category && v.category?.toLowerCase() === currentVideo.category?.toLowerCase()
-        );
+        const matchedCategory = otherVideos.find((v) => {
+            const vCats = (v.category || "").toLowerCase().split(",").map((c) => c.trim());
+            return currentCats.some((c) => vCats.includes(c));
+        });
         if (matchedCategory) return matchedCategory;
 
         const matchedChannel = otherVideos.find(

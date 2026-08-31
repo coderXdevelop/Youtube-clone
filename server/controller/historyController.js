@@ -5,9 +5,25 @@ import history from "../model/history.js";
 export const handlehistory = async (req, res) => {
     const { userId } = req.body;
     const { videoId } = req.params;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: "Valid userId is required" });
+    }
+    if (!videoId || !mongoose.Types.ObjectId.isValid(videoId)) {
+        return res.status(400).json({ message: "Valid videoId is required" });
+    }
+
     try {
-        await history.create({ viewer: userId, videoid: videoId });
-        await video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
+        let record = await history.findOne({ viewer: userId, videoid: videoId });
+        if (record) {
+            record.likedon = new Date();
+            await record.save();
+            // Delete any duplicate records for the same viewer and videoId if present
+            await history.deleteMany({ viewer: userId, videoid: videoId, _id: { $ne: record._id } });
+        } else {
+            await history.create({ viewer: userId, videoid: videoId });
+            await video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
+        }
         return res.status(200).json({ history: true });
     } catch (error) {
         console.error("handlehistory error:", error);
@@ -32,14 +48,28 @@ export const getallhistoryVideo = async (req, res) => {
         return res.status(400).json({ message: "Invalid user ID" });
     }
     try {
-        const historyvideo = await history
+        const rawHistory = await history
             .find({ viewer: userId })
             .populate({
                 path: "videoid",
                 model: "videofiles",
             })
-            .sort({ createdAt: -1 })
+            .sort({ updatedAt: -1, createdAt: -1 })
             .exec();
+
+        // Filter out null video references and deduplicate by videoid
+        const seenVideoIds = new Set();
+        const historyvideo = [];
+
+        for (const item of rawHistory) {
+            if (!item.videoid) continue;
+            const vId = item.videoid._id ? item.videoid._id.toString() : item.videoid.toString();
+            if (!seenVideoIds.has(vId)) {
+                seenVideoIds.add(vId);
+                historyvideo.push(item);
+            }
+        }
+
         return res.status(200).json(historyvideo);
     } catch (error) {
         console.error("getallhistoryVideo error:", error);
@@ -75,7 +105,12 @@ export const deleteHistoryItem = async (req, res) => {
         return res.status(400).json({ message: "Invalid history record ID" });
     }
     try {
-        await history.findByIdAndDelete(id);
+        const target = await history.findById(id);
+        if (target) {
+            await history.deleteMany({ viewer: target.viewer, videoid: target.videoid });
+        } else {
+            await history.findByIdAndDelete(id);
+        }
         return res.status(200).json({ success: true, message: "History item removed successfully." });
     } catch (error) {
         console.error("deleteHistoryItem error:", error);

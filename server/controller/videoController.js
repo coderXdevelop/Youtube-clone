@@ -59,7 +59,19 @@ export const UploadVideo = async (req, res) => {
         }
 
         const description = req.body.videodescription || req.body.description || "";
-        const category = req.body.category || "All";
+        let categoryRaw = req.body.category || "All";
+        let categoryStr = "All";
+
+        if (Array.isArray(categoryRaw)) {
+            const valid = categoryRaw.map((c) => String(c).trim()).filter(Boolean);
+            categoryStr = valid.length > 0 ? valid.join(", ") : "All";
+        } else if (typeof categoryRaw === "string") {
+            const valid = categoryRaw
+                .split(",")
+                .map((c) => c.trim())
+                .filter(Boolean);
+            categoryStr = valid.length > 0 ? valid.join(", ") : "All";
+        }
 
         const uploaderId = req.body.uploader || "";
         let uploaderImage = "";
@@ -74,7 +86,7 @@ export const UploadVideo = async (req, res) => {
             videotitle: req.body.videotitle,
             videodescription: description,
             description: description,
-            category: category,
+            category: categoryStr,
             filename: videoFile.originalname,
             filepath: videoFile.path.replace(/\\/g, "/"),
             filetype: videoFile.mimetype,

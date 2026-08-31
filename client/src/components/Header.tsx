@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Menu, Mic, Search, User, VideoIcon, ShieldCheck, Sun, Moon } from "lucide-react";
+import { Menu, Mic, Search, User, VideoIcon, ShieldCheck, Sun, Moon } from "lucide-react";
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import Link from "next/link";
@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useEnvironment } from "@/lib/EnvironmentContext";
 import { cn } from "@/lib/utils";
 import Channeldialogue from "./ChannelDialog";
+import VoiceSearchModal from "./VoiceSearchModal";
 import { useUser } from "@/lib/AuthContext";
 
 interface HeaderProps {
@@ -32,12 +33,20 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [isDialogueOpen, setIsDialogueOpen] = useState(false);
+    const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
     const router = useRouter();
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
             router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        }
+    };
+
+    const handleVoiceTranscript = (transcript: string) => {
+        if (transcript.trim()) {
+            setSearchQuery(transcript.trim());
+            router.push(`/search?q=${encodeURIComponent(transcript.trim())}`);
         }
     };
 
@@ -108,12 +117,14 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                     type="button"
                     variant="ghost"
                     size="icon"
+                    onClick={() => setIsVoiceModalOpen(true)}
+                    title="Search with your voice"
                     className={cn(
-                        "rounded-full h-8 w-8 sm:h-10 sm:w-10 hover:bg-gray-100 dark:hover:bg-neutral-800 hidden sm:inline-flex shrink-0",
+                        "rounded-full h-8 w-8 sm:h-10 sm:w-10 hover:bg-gray-100 dark:hover:bg-neutral-800 hidden sm:inline-flex shrink-0 cursor-pointer",
                         isLight ? "text-gray-700" : "text-white"
                     )}
                 >
-                    <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Mic className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-500" />
                 </Button>
             </form>
 
@@ -129,14 +140,6 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                             title="Create"
                         >
                             <VideoIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn("h-8 w-8 sm:h-9 sm:w-9 hidden md:inline-flex", isLight ? "text-gray-800 hover:bg-gray-100" : "text-white hover:bg-neutral-800")}
-                            title="Notifications"
-                        >
-                            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
                         </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 dark:hover:ring-neutral-700 transition-all outline-none cursor-pointer">
@@ -225,6 +228,13 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                 isopen={isDialogueOpen}
                 onclose={() => setIsDialogueOpen(false)}
                 mode="create"
+            />
+
+            {/* Voice Search Modal */}
+            <VoiceSearchModal
+                isOpen={isVoiceModalOpen}
+                onClose={() => setIsVoiceModalOpen(false)}
+                onTranscript={handleVoiceTranscript}
             />
         </header>
     );

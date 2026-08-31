@@ -60,13 +60,17 @@ const Videogrid = ({ selectedCategory = "All", onResetCategory }: VideoGridProps
         }
 
         const categoryLower = selectedCategory.toLowerCase();
-        const videoCat = (video.category || "").toLowerCase();
+        const videoCategories = (video.category || "")
+            .toLowerCase()
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean);
         const title = (video.videotitle || "").toLowerCase();
         const channel = (video.videochanel || "").toLowerCase();
         const desc = (video.description || video.videodescription || "").toLowerCase();
 
-        // 1. Direct match on category field
-        if (videoCat === categoryLower) return true;
+        // 1. Direct match on any assigned category
+        if (videoCategories.some((cat) => cat === categoryLower)) return true;
 
         // 2. Direct match on title, channel name, or description
         if (title.includes(categoryLower) || channel.includes(categoryLower) || desc.includes(categoryLower)) {

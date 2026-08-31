@@ -27,10 +27,19 @@ export default function RelatedVideos({
     let scoreA = 0;
     let scoreB = 0;
 
-    if (currentCategory && a.category && a.category.toLowerCase() === currentCategory.toLowerCase()) {
+    const currentCats = (currentCategory || "")
+      .toLowerCase()
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    const catsA = (a.category || "").toLowerCase().split(",").map((c) => c.trim());
+    const catsB = (b.category || "").toLowerCase().split(",").map((c) => c.trim());
+
+    if (currentCats.some((c) => catsA.includes(c))) {
       scoreA += 2;
     }
-    if (currentCategory && b.category && b.category.toLowerCase() === currentCategory.toLowerCase()) {
+    if (currentCats.some((c) => catsB.includes(c))) {
       scoreB += 2;
     }
     if (currentChannel && a.videochanel && a.videochanel.toLowerCase() === currentChannel.toLowerCase()) {

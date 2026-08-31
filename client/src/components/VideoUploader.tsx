@@ -39,13 +39,27 @@ const VideoUploader = ({ channelId, channelName, onUploadSuccess }: VideoUploade
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoDescription, setVideoDescription] = useState("");
-  const [category, setCategory] = useState("Technology");
+  const [categories, setCategories] = useState<string[]>(["Technology"]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [autoThumbnailData, setAutoThumbnailData] = useState<string>("");
   const [uploadComplete, setUploadComplete] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
+
+  const selectableCategories = CATEGORIES.filter((c) => c.toLowerCase() !== "all");
+
+  const toggleCategory = (cat: string) => {
+    if (isUploading || uploadComplete) return;
+    setCategories((prev) => {
+      if (prev.includes(cat)) {
+        if (prev.length === 1) return prev; // Keep at least one category selected
+        return prev.filter((c) => c !== cat);
+      } else {
+        return [...prev, cat];
+      }
+    });
+  };
 
   // Generate a thumbnail frame from the uploaded video file
   const generateVideoThumbnail = (file: File) => {
@@ -117,7 +131,7 @@ const VideoUploader = ({ channelId, channelName, onUploadSuccess }: VideoUploade
     setAutoThumbnailData("");
     setVideoTitle("");
     setVideoDescription("");
-    setCategory("Technology");
+    setCategories(["Technology"]);
     setIsUploading(false);
     setUploadProgress(0);
     setUploadComplete(false);
@@ -143,7 +157,7 @@ const VideoUploader = ({ channelId, channelName, onUploadSuccess }: VideoUploade
     formdata.append("videotitle", videoTitle.trim());
     formdata.append("videodescription", videoDescription.trim());
     formdata.append("description", videoDescription.trim());
-    formdata.append("category", category);
+    formdata.append("category", categories.join(", ") || "Technology");
     formdata.append("videochanel", channelName || "My Channel");
     formdata.append("uploader", channelId || "");
 
@@ -275,22 +289,35 @@ const VideoUploader = ({ channelId, channelName, onUploadSuccess }: VideoUploade
                 </div>
 
                 <div>
-                  <Label htmlFor="category" className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    Category
-                  </Label>
-                  <select
-                    id="category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    disabled={isUploading || uploadComplete}
-                    className="mt-1 w-full rounded-md border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:outline-none"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Categories (select one or more)
+                    </Label>
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                      {categories.length} selected
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 max-h-36 overflow-y-auto">
+                    {selectableCategories.map((cat) => {
+                      const isSelected = categories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          disabled={isUploading || uploadComplete}
+                          className={`text-xs px-3 py-1 rounded-full font-medium transition-all flex items-center gap-1.5 ${
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "bg-gray-100 dark:bg-zinc-700/60 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

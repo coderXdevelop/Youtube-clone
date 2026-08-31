@@ -49,7 +49,7 @@ export const computeCurrentIstTheme = (): ThemeMode => {
 export const EnvironmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [themePreference, setThemePreferenceState] = useState<ThemePreference>("auto");
     const [theme, setThemeState] = useState<ThemeMode>("light");
-    const [isSidebarOpen, setSidebarOpen] = useState(false);
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     const toggleSidebar = () => setSidebarOpen((prev) => !prev);
     const closeSidebar = () => setSidebarOpen(false);
