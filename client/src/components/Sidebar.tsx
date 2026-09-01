@@ -29,6 +29,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
     const { user } = useUser();
     const { isSidebarOpen, closeSidebar } = useEnvironment();
     const pathname = usePathname();
+    const isHomePage = pathname === "/";
+
+    if (!isHomePage) return null;
 
     const navItems = [
         { label: "Home", href: "/", icon: Home },
@@ -141,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 <div className={cn("fixed inset-0 z-50 flex select-none", className?.includes("hidden") ? "block" : "lg:hidden")}>
                     {/* Backdrop */}
                     <div
-                        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-200"
+                        className="fixed inset-0 bg-black/50 transition-opacity duration-200"
                         onClick={closeSidebar}
                         aria-hidden="true"
                     />

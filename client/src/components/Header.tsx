@@ -13,7 +13,7 @@ import {
     DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEnvironment } from "@/lib/EnvironmentContext";
 import { cn } from "@/lib/utils";
 import Channeldialogue from "./ChannelDialog";
@@ -28,6 +28,8 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     const { user, logout, handlegooglesignin } = useUser();
     const { theme, setThemePreference, toggleSidebar: envToggleSidebar } = useEnvironment();
     const isLight = theme === "light";
+    const pathname = usePathname();
+    const isHomePage = pathname === "/";
 
     const onToggle = toggleSidebar || envToggleSidebar;
 
@@ -67,15 +69,17 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         >
             {/* Left Section */}
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onToggle}
-                    className={cn("h-9 w-9", isLight ? "text-gray-900 hover:bg-gray-100" : "text-white hover:bg-neutral-800")}
-                    aria-label="Toggle Navigation Menu"
-                >
-                    <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-                </Button>
+                {isHomePage && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onToggle}
+                        className={cn("h-9 w-9", isLight ? "text-gray-900 hover:bg-gray-100" : "text-white hover:bg-neutral-800")}
+                        aria-label="Toggle Navigation Menu"
+                    >
+                        <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </Button>
+                )}
                 <Link href="/" className="flex items-center gap-1.5 select-none group">
                     <div className="bg-red-600 p-1 sm:p-1.5 rounded-lg flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="w-4 h-4 sm:w-5 sm:h-5">
