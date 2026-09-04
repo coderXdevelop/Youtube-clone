@@ -1,6 +1,6 @@
 "use client";
 
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { useState, useEffect, useContext, createContext } from "react";
 import { provider, auth } from "./firebase";
 import axiosInstance from "./AxiosInstance";
@@ -116,8 +116,17 @@ export const UserProvider = ({ children }) => {
                 console.log("Firebase sign-in popup was closed or cancelled.");
                 return;
             }
+            if (error.code === "auth/popup-blocked") {
+                console.warn("Popup blocked by browser. Falling back to redirect sign-in...");
+                try {
+                    await signInWithRedirect(auth, provider);
+                    return;
+                } catch (redirectErr) {
+                    console.error("Firebase redirect sign-in error:", redirectErr);
+                }
+            }
             console.error("Google sign in error:", error);
-            alert(`Google Sign-In error: ${error.message || error}`);
+            alert(`Google Sign-In: ${error.message || error}. Please allow popups or try again.`);
         }
     };
 

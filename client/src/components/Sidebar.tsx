@@ -11,6 +11,7 @@ import {
     User,
     Download,
     ShieldCheck,
+    Video,
     X,
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -44,6 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
         { label: "Liked videos", href: "/liked", icon: ThumbsUp },
         { label: "Watch later", href: "/watch-later", icon: Clock },
         { label: "Downloads", href: "/downloads", icon: Download },
+        { label: "Video Calls", href: "/meet", icon: Video },
         { label: "Security & Sessions", href: "/security", icon: ShieldCheck },
     ];
 

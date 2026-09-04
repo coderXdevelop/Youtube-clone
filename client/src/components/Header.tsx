@@ -186,6 +186,9 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                                     <Link href="/downloads" className="w-full">Downloads</Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
+                                    <Link href="/meet" className="w-full">Video Calls</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
                                     <Link href="/subscriptions" className="flex items-center gap-2 w-full">
                                         Subscriptions & Plans
                                     </Link>

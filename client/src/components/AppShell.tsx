@@ -8,6 +8,11 @@ import { usePathname } from "next/navigation";
 export default function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isHomePage = pathname === "/";
+    const isInsideCallRoom = pathname.startsWith("/meet/") && pathname !== "/meet";
+
+    if (isInsideCallRoom) {
+        return <div className="h-screen w-screen overflow-hidden bg-neutral-950">{children}</div>;
+    }
 
     return (
         <div className="flex flex-col min-h-screen h-screen bg-white dark:bg-zinc-950 text-gray-900 dark:text-gray-100 overflow-hidden">

@@ -13,15 +13,31 @@ import downloadRoute from "./routes/downloadRoute.js";
 import subscriptionRoute from "./routes/subscriptionRoute.js";
 import paymentRoute from "./routes/paymentRoute.js";
 
+import http from "http";
+import { Server } from "socket.io";
+import meetingRoute from "./routes/meetingRoute.js";
+import { setupMeetingSocket } from "./socket/meetingHandler.js";
+
 connectToDB();
 
 const app = express();
+const server = http.createServer(app);
 
 const allowedOrigins = Array.from(new Set([
     ...config.frontendUrl.split(",").map((url) => url.trim()).filter(Boolean),
     "http://localhost:3000",
     "http://127.0.0.1:3000"
 ]));
+
+const io = new Server(server, {
+    cors: {
+        origin: allowedOrigins,
+        credentials: true,
+        methods: ["GET", "POST"]
+    }
+});
+
+setupMeetingSocket(io);
 
 app.use(cors({
     origin: allowedOrigins,
@@ -41,8 +57,9 @@ app.use("/api/watch", watchlaterRoute);
 app.use("/api/download", downloadRoute);
 app.use("/api/subscription", subscriptionRoute);
 app.use("/api/payment", paymentRoute);
+app.use("/api/meeting", meetingRoute);
 app.use("/api", paymentRoute);
 
-app.listen(config.port, () => {
+server.listen(config.port, () => {
     console.log(`Server is running on port ${config.port}`);
 });
