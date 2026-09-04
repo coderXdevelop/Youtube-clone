@@ -274,6 +274,93 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         []
     );
 
+    // Leave room cleanup
+    const leaveRoom = useCallback(() => {
+        if (socketRef.current) {
+            socketRef.current.emit("leave-room");
+            socketRef.current.disconnect();
+            socketRef.current = null;
+        }
+
+        peerConnectionsRef.current.forEach((pc) => pc.close());
+        peerConnectionsRef.current.clear();
+
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach((t) => t.stop());
+            localStreamRef.current = null;
+        }
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach((t) => t.stop());
+            screenStreamRef.current = null;
+        }
+
+        setLocalStream(null);
+        setScreenStream(null);
+        setIsJoined(false);
+    }, []);
+
+    // Toggle Audio Mute
+    const toggleMute = useCallback(async (forceVal?: boolean) => {
+        const targetMutedState = forceVal !== undefined ? forceVal : !isMuted;
+        let stream = localStreamRef.current;
+        let audioTrack = stream?.getAudioTracks()?.[0];
+
+        // If no live audio track exists, re-fetch audio track
+        if (!audioTrack || audioTrack.readyState === "ended") {
+            try {
+                const newAudStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                    video: false,
+                });
+                const newAudioTrack = newAudStream.getAudioTracks()[0];
+
+                if (stream) {
+                    const activeStream = stream;
+                    activeStream.getAudioTracks().forEach((t) => {
+                        t.stop();
+                        activeStream.removeTrack(t);
+                    });
+                    activeStream.addTrack(newAudioTrack);
+                } else {
+                    stream = new MediaStream([newAudioTrack]);
+                    localStreamRef.current = stream;
+                }
+                audioTrack = newAudioTrack;
+
+                peerConnectionsRef.current.forEach((pc) => {
+                    const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+                    if (sender) {
+                        sender.replaceTrack(newAudioTrack);
+                    } else if (stream) {
+                        pc.addTrack(newAudioTrack, stream);
+                    }
+                });
+            } catch (err) {
+                console.error("Could not re-acquire audio track:", err);
+                setIsMuted(true);
+                return;
+            }
+        }
+
+        audioTrack.enabled = !targetMutedState;
+        setIsMuted(targetMutedState);
+
+        peerConnectionsRef.current.forEach((pc) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+            if (sender && sender.track) {
+                sender.track.enabled = !targetMutedState;
+            }
+        });
+
+        if (stream) {
+            setLocalStream(new MediaStream(stream.getTracks()));
+        }
+
+        if (socketRef.current && roomId) {
+            socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
+        }
+    }, [isMuted, roomId]);
+
     // Join room function
     const joinRoom = useCallback(async () => {
         if (!user) return;
@@ -417,96 +504,69 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         });
 
         return socket;
-    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, onKicked, onCallEnded]);
-
-    // Leave room cleanup
-    const leaveRoom = useCallback(() => {
-        if (socketRef.current) {
-            socketRef.current.emit("leave-room");
-            socketRef.current.disconnect();
-            socketRef.current = null;
-        }
-
-        peerConnectionsRef.current.forEach((pc) => pc.close());
-        peerConnectionsRef.current.clear();
-
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach((t) => t.stop());
-            localStreamRef.current = null;
-        }
-        if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach((t) => t.stop());
-            screenStreamRef.current = null;
-        }
-
-        setLocalStream(null);
-        setScreenStream(null);
-        setIsJoined(false);
-    }, []);
-
-    // Toggle Audio Mute
-    const toggleMute = useCallback(async (forceVal?: boolean) => {
-        const newMutedState = forceVal !== undefined ? forceVal : !isMuted;
-        if (localStreamRef.current) {
-            const audioTracks = localStreamRef.current.getAudioTracks();
-            if (audioTracks.length > 0 && audioTracks[0].readyState === "live") {
-                audioTracks.forEach((track) => {
-                    track.enabled = !newMutedState;
-                });
-                setIsMuted(newMutedState);
-            } else {
-                if (!newMutedState) {
-                    await initLocalStream(selectedVideoDevice, selectedAudioDevice);
-                    setIsMuted(false);
-                } else {
-                    setIsMuted(true);
-                }
-            }
-        } else {
-            if (!newMutedState) {
-                await initLocalStream(selectedVideoDevice, selectedAudioDevice);
-                setIsMuted(false);
-            } else {
-                setIsMuted(true);
-            }
-        }
-
-        if (socketRef.current && roomId) {
-            socketRef.current.emit("toggle-audio", { roomId, isMuted: newMutedState });
-        }
-    }, [isMuted, roomId, initLocalStream, selectedVideoDevice, selectedAudioDevice]);
+    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, onKicked, onCallEnded, leaveRoom, toggleMute]);
 
     // Toggle Camera On/Off
     const toggleCamera = useCallback(async (forceVal?: boolean) => {
-        const newCamState = forceVal !== undefined ? forceVal : !isCameraOff;
-        if (localStreamRef.current) {
-            const videoTracks = localStreamRef.current.getVideoTracks();
-            if (videoTracks.length > 0 && videoTracks[0].readyState === "live") {
-                videoTracks.forEach((track) => {
-                    track.enabled = !newCamState;
+        const targetCameraOffState = forceVal !== undefined ? forceVal : !isCameraOff;
+        let stream = localStreamRef.current;
+        let videoTrack = stream?.getVideoTracks()?.[0];
+
+        // If no live video track exists, re-fetch video track
+        if (!videoTrack || videoTrack.readyState === "ended") {
+            try {
+                const newVidStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode },
+                    audio: false,
                 });
-                setIsCameraOff(newCamState);
-            } else {
-                if (!newCamState) {
-                    await initLocalStream(selectedVideoDevice, selectedAudioDevice);
-                    setIsCameraOff(false);
+                const newVideoTrack = newVidStream.getVideoTracks()[0];
+
+                if (stream) {
+                    const activeStream = stream;
+                    activeStream.getVideoTracks().forEach((t) => {
+                        t.stop();
+                        activeStream.removeTrack(t);
+                    });
+                    activeStream.addTrack(newVideoTrack);
                 } else {
-                    setIsCameraOff(true);
+                    stream = new MediaStream([newVideoTrack]);
+                    localStreamRef.current = stream;
                 }
-            }
-        } else {
-            if (!newCamState) {
-                await initLocalStream(selectedVideoDevice, selectedAudioDevice);
-                setIsCameraOff(false);
-            } else {
+                videoTrack = newVideoTrack;
+
+                peerConnectionsRef.current.forEach((pc) => {
+                    const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+                    if (sender) {
+                        sender.replaceTrack(newVideoTrack);
+                    } else if (stream) {
+                        pc.addTrack(newVideoTrack, stream);
+                    }
+                });
+            } catch (err) {
+                console.error("Could not re-acquire video track:", err);
                 setIsCameraOff(true);
+                return;
             }
         }
 
-        if (socketRef.current && roomId) {
-            socketRef.current.emit("toggle-video", { roomId, isCameraOff: newCamState });
+        videoTrack.enabled = !targetCameraOffState;
+        setIsCameraOff(targetCameraOffState);
+
+        peerConnectionsRef.current.forEach((pc) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+            if (sender && sender.track) {
+                sender.track.enabled = !targetCameraOffState;
+            }
+        });
+
+        if (stream) {
+            setLocalStream(new MediaStream(stream.getTracks()));
         }
-    }, [isCameraOff, roomId, initLocalStream, selectedVideoDevice, selectedAudioDevice]);
+
+        if (socketRef.current && roomId) {
+            socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
+        }
+    }, [isCameraOff, roomId, facingMode]);
 
     // Switch Camera (Front/Rear on Mobile)
     const switchCamera = useCallback(async () => {
