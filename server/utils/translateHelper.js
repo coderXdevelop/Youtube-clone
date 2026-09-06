@@ -52,13 +52,53 @@ const withTimeout = (ms) => AbortSignal.timeout ? AbortSignal.timeout(ms) : unde
 // MyMemory requires its own dialect for some codes
 const MYMEMORY_LANG_MAP = { zh: "zh-CN", he: "iw" };
 
-// When autodetect fails for Latin-script text, probe these source langs in order.
-// Ordered by global comment frequency: Spanish, French, Italian, German, Portuguese, Turkish.
-const LATIN_PROBE_LANGS = ["es", "fr", "it", "de", "pt", "tr", "nl", "pl", "sv"];
+// When autodetect fails for short Latin-script text, probe these source langs in order.
+const LATIN_PROBE_LANGS = ["it", "es", "fr", "de", "pt", "tr", "nl", "pl", "sv", "ro"];
+
+/**
+ * Validates whether a candidate translation string is plausible and clean.
+ */
+const cleanCandidate = (text, original) => {
+    if (!text || typeof text !== "string") return null;
+    const clean = text.trim();
+    if (!clean) return null;
+    if (clean.toLowerCase() === original.toLowerCase()) return null;
+    if (clean.includes("*****") || clean.includes("(disambiguation)") || /reviewed words/i.test(clean)) return null;
+
+    // Reject word explosions (e.g. 1 input word turning into 5+ words of translation notes)
+    const inWords = original.trim().split(/\s+/).length;
+    const outWords = clean.split(/\s+/).length;
+    if (inWords === 1 && outWords > 4) return null;
+    if (original.trim().length <= 10 && clean.length > 35) return null;
+
+    return clean;
+};
+
+/**
+ * Extracts the best translation from MyMemory API response, checking both
+ * the primary translatedText and the matches array for clean results.
+ */
+const extractBestTranslation = (data, original) => {
+    const rawTop = data?.responseData?.translatedText;
+    const cleanTop = cleanCandidate(rawTop, original);
+    if (cleanTop) return cleanTop;
+
+    if (Array.isArray(data?.matches)) {
+        for (const m of data.matches) {
+            const candidate = cleanCandidate(m.translation, original);
+            if (candidate) {
+                return candidate;
+            }
+        }
+    }
+    return rawTop || null;
+};
 
 /**
  * Single MyMemory call.
- * Returns { translatedText, detectedSourceLang } on success, throws on failure.
+ * Returns { translatedText, detectedSourceLang, sameAsInput } on success.
+ * @param {string} text - text to translate
+ * @param {string} targetLang - target language code
  * @param {string} sl - source language code OR "autodetect"
  */
 const myMemoryCall = async (text, targetLang, sl) => {
@@ -72,13 +112,13 @@ const myMemoryCall = async (text, targetLang, sl) => {
     const data = await res.json();
     if (data?.responseStatus !== 200) throw new Error(`MyMemory status ${data?.responseStatus}: ${data?.responseDetails}`);
 
-    const translated = data?.responseData?.translatedText;
-    if (!translated) throw new Error("MyMemory returned empty translatedText");
+    const bestText = extractBestTranslation(data, text);
+    if (!bestText) throw new Error("MyMemory returned empty translation");
 
     return {
-        translatedText: translated,
+        translatedText: bestText,
         detectedSourceLang: data?.responseData?.detectedLanguage || sl,
-        sameAsInput: translated.trim().toLowerCase() === text.trim().toLowerCase(),
+        sameAsInput: bestText.trim().toLowerCase() === text.trim().toLowerCase(),
     };
 };
 
@@ -109,7 +149,6 @@ export const translateText = async (text, targetLang = "en", sourceLang = "auto"
     if (effectiveSrc !== "auto") {
         try {
             const result = await myMemoryCall(cleanText, targetLang, effectiveSrc);
-            // Accept even if same as input — may be an untranslatable proper noun or slang
             return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
         } catch (err) {
             console.warn("[translate] MyMemory (known src) failed:", err.message);
@@ -120,43 +159,34 @@ export const translateText = async (text, targetLang = "en", sourceLang = "auto"
     try {
         const result = await myMemoryCall(cleanText, targetLang, "autodetect");
         if (!result.sameAsInput) {
-            // Autodetect worked and produced a different result — use it
+            // Autodetect worked and produced a valid translation
             return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
         }
-        // Autodetect couldn't identify the language (short Latin-script word) → Strategy B
-        console.warn("[translate] MyMemory autodetect returned same text, trying language probing");
+        console.warn("[translate] MyMemory autodetect returned same text, trying language probing for:", cleanText);
     } catch (err) {
         console.warn("[translate] MyMemory autodetect failed:", err.message);
     }
 
-    // ─── Strategy B: probe common Latin-script source languages ─────────────
-    // Handles words like "Hola" → es, "Bonjour" → fr that are long enough for TM lookup
-    // but too short for autodetect. Only probe if text is >= 6 chars to avoid garbage TM results
-    // for very short words (e.g. "Ciao" probed as French gives irrelevant TM noise).
-    if (cleanText.length >= 6) {
-        const probeTargets = LATIN_PROBE_LANGS.filter((l) => l !== targetLang);
-        for (const probeLang of probeTargets) {
-            try {
-                const result = await myMemoryCall(cleanText, targetLang, probeLang);
-                if (!result.sameAsInput) {
-                    return { translatedText: result.translatedText, detectedSourceLang: probeLang, targetLang, failed: false };
-                }
-            } catch {
-                // Try next
+    // ─── Strategy B: Probe common Latin-script source languages ─────────────
+    // For short words (e.g. "Ciao", "Grazie") where autodetect returns same text
+    const probeTargets = LATIN_PROBE_LANGS.filter((l) => l !== targetLang);
+    for (const probeLang of probeTargets) {
+        try {
+            const result = await myMemoryCall(cleanText, targetLang, probeLang);
+            if (!result.sameAsInput) {
+                return { translatedText: result.translatedText, detectedSourceLang: probeLang, targetLang, failed: false };
             }
+        } catch {
+            // Try next probe language
         }
     }
 
-    // For very short or truly untranslatable text (slang, proper nouns), return the
-    // autodetect result as-is rather than failing — it IS a valid translation outcome.
-    // The client already has the autodetect result from Strategy A2 above (same as input).
-    // Re-fetch it cleanly here to return a proper success response.
+    // For untranslatable text (slang, proper nouns), return the text safely as success
     try {
         const result = await myMemoryCall(cleanText, targetLang, "autodetect");
-        // Accept same-as-input for short/untranslatable content
         return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
     } catch {
-        // fall through to final failure
+        // Fall through to final failure
     }
 
     // All strategies exhausted
