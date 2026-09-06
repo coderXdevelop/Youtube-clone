@@ -602,8 +602,15 @@ export const translatecomment = async (req, res) => {
             });
         }
 
-        // Translate using free public endpoint / fallback dictionary
+        // Translate using production-safe multi-tier helper
         const translationResult = await translateText(existingComment.commentbody, targetLang);
+
+        // If all providers failed, return a proper error — do NOT silently return original text
+        if (translationResult.failed || !translationResult.translatedText) {
+            return res.status(502).json({
+                message: "Translation service is temporarily unavailable. Please try again shortly.",
+            });
+        }
 
         // Cache translation in comment document
         const updateKey = `translations.${targetLang}`;
@@ -613,7 +620,7 @@ export const translatecomment = async (req, res) => {
 
         return res.status(200).json({
             translatedText: translationResult.translatedText,
-            detectedSource: translationResult.detectedSource,
+            detectedSource: translationResult.detectedSourceLang,  // fixed: was translationResult.detectedSource (undefined)
             fromCache: false,
         });
     } catch (error) {

@@ -239,16 +239,20 @@ const CommentItem = ({
 
     // Translation toggle
     const handleToggleTranslate = async () => {
+        // Toggle off
         if (isTranslated) {
             setIsTranslated(false);
             return;
         }
 
-        if (translatedText) {
+        // Already translated and not an error — show cached result
+        if (translatedText && !translationError) {
             setIsTranslated(true);
             return;
         }
 
+        // Fresh request (or retry after error — clear stale state)
+        setTranslatedText(null);
         setIsTranslating(true);
         setTranslationError(null);
         try {
@@ -258,9 +262,13 @@ const CommentItem = ({
             if (res.data?.translatedText) {
                 setTranslatedText(res.data.translatedText);
                 setIsTranslated(true);
+            } else {
+                setTranslationError("Translation unavailable. Click to retry.");
             }
-        } catch {
-            setTranslationError("Translation unavailable. Click to retry.");
+        } catch (err: unknown) {
+            // Show the server's actual error message when available (e.g. 502 from provider outage)
+            const serverMsg = axios.isAxiosError(err) && err.response?.data?.message;
+            setTranslationError(serverMsg || "Translation unavailable. Click to retry.");
         } finally {
             setIsTranslating(false);
         }
