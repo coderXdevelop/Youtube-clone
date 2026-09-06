@@ -115,6 +115,7 @@ const SearchResult = ({ query }: SearchResultProps) => {
                       <img
                         src={thumbUrl}
                         alt={item.videotitle}
+                        crossOrigin="anonymous"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       />
                     ) : (

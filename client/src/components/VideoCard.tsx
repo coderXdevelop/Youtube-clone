@@ -45,6 +45,7 @@ export default function VideoCard({ video }: VideoCardProps) {
             <img
               src={thumbUrl}
               alt={video?.videotitle || "Video thumbnail"}
+              crossOrigin="anonymous"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             />
           ) : (

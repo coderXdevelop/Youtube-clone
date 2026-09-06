@@ -405,6 +405,7 @@ export const verifySubscriptionPayment = async (req, res) => {
                     currency: transaction.currency || "INR",
                     paymentId: generatedPaymentId,
                     date: transaction.subscriptionstart || new Date(),
+                    validUntil: transaction.subscriptionend,
                 });
                 console.log(`[SUBSCRIPTION] Invoice email dispatched to ${targetEmail}:`, invoiceRes);
             } catch (emailErr) {

@@ -332,7 +332,6 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 localStreamRef.current.getAudioTracks().forEach((track) => {
                     track.enabled = !targetMutedState;
                 });
-                setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
             }
 
             peerConnectionsRef.current.forEach((pc) => {
@@ -506,7 +505,6 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 localStreamRef.current.getVideoTracks().forEach((track) => {
                     track.enabled = !targetCameraOffState;
                 });
-                setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
             }
 
             peerConnectionsRef.current.forEach((pc) => {

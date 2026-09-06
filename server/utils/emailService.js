@@ -36,7 +36,7 @@ export const sendBrevoEmail = async ({ toEmail, toName, subject, htmlContent }) 
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.warn(`[BREVO EMAIL] Failed to send email to ${toEmail}. Status: ${response.status}`, errorText);
+            console.warn(`[BREVO EMAIL] Failed to send email to ${toEmail}. Status: ${response.status}. Body: ${errorText}`);
             return { success: false, status: response.status, error: errorText };
         }
 
@@ -110,20 +110,23 @@ export const sendSubscriptionInvoiceEmail = async ({
     currency = "INR",
     paymentId,
     date,
+    validUntil,
 }) => {
-    const formattedAmount = `₹${amount.toLocaleString()}`;
+    const amountNum = Number(amount) || 0;
+    const formattedAmount = `₹${amountNum.toLocaleString("en-IN")}`;
     const formattedDate = date ? new Date(date).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }) : new Date().toLocaleDateString();
+    const formattedValidUntil = validUntil ? new Date(validUntil).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }) : "";
 
-    const subject = `Subscription Purchase Invoice ${invoiceNumber} - ${plan} Plan`;
+    const subject = `✅ Subscription Active — ${plan} Plan Invoice (${invoiceNumber})`;
     const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
             <div style="background: linear-gradient(135deg, #312e81 0%, #4338ca 100%); padding: 24px; text-align: center; border-radius: 8px 8px 0 0; color: #ffffff;">
-                <h1 style="margin: 0; font-size: 24px;">Subscription Active!</h1>
+                <h1 style="margin: 0; font-size: 24px;">🎉 Subscription Active!</h1>
                 <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.9;">Thank you for your purchase</p>
             </div>
             <div style="padding: 24px; color: #334155;">
                 <p>Hi <strong>${customerName || "Subscriber"}</strong>,</p>
-                <p>Your payment for the <strong>${plan} Plan</strong> (${billingcycle}) has been processed successfully. Below is your official tax invoice receipt:</p>
+                <p>Your payment for the <strong>${plan} Plan</strong> (${billingcycle}) has been processed successfully. Below is your official invoice receipt:</p>
 
                 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -147,6 +150,11 @@ export const sendSubscriptionInvoiceEmail = async ({
                             <td style="padding: 6px 0; color: #64748b;">Billing Cycle:</td>
                             <td style="padding: 6px 0; text-align: right; text-transform: capitalize;">${billingcycle}</td>
                         </tr>
+                        ${formattedValidUntil ? `
+                        <tr>
+                            <td style="padding: 6px 0; color: #64748b;">Valid Until:</td>
+                            <td style="padding: 6px 0; text-align: right; font-weight: bold; color: #059669;">${formattedValidUntil}</td>
+                        </tr>` : ""}
                         <tr style="border-top: 1px solid #cbd5e1;">
                             <td style="padding: 12px 0 6px 0; font-weight: bold; font-size: 15px;">Total Amount Paid:</td>
                             <td style="padding: 12px 0 6px 0; text-align: right; font-weight: bold; font-size: 16px; color: #059669;">${formattedAmount} ${currency}</td>
@@ -155,12 +163,14 @@ export const sendSubscriptionInvoiceEmail = async ({
                 </div>
 
                 <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 14px; font-size: 13px; color: #065f46;">
-                    <strong>Status: PAID & VERIFIED</strong><br />
-                    Your account now has full access to ${plan} Plan perks including higher download limits, ad-free streaming, and HD quality playback.
+                    <strong>✅ Status: PAID &amp; VERIFIED</strong><br />
+                    Your account now has full access to ${plan} Plan perks including higher download limits, ad-free streaming, and premium quality playback.
                 </div>
+
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">If you have any questions, please contact our support team. This is an automated receipt — please do not reply to this email.</p>
             </div>
             <div style="text-align: center; padding: 16px; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9;">
-                <p style="margin: 0;">YouTube Clone Billing Department • Automatic Receipt</p>
+                <p style="margin: 0;">YouTube Clone Billing Department • Automated Receipt</p>
             </div>
         </div>
     `;

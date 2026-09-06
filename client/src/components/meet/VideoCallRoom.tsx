@@ -124,13 +124,18 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         return `${mins.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     };
 
-    // Attach local stream to video element
+    // Attach local stream to video element — always keep srcObject up to date
     useEffect(() => {
-        if (localVideoRef.current && (localStream || screenStream)) {
-            localVideoRef.current.srcObject = screenStream || localStream;
-            localVideoRef.current.play().catch(() => {});
+        const video = localVideoRef.current;
+        if (!video) return;
+        const nextStream = screenStream || localStream;
+        if (nextStream && video.srcObject !== nextStream) {
+            video.srcObject = nextStream;
+            video.play().catch(() => {});
+        } else if (!nextStream) {
+            video.srcObject = null;
         }
-    }, [localStream, screenStream, isCameraOff]);
+    }, [localStream, screenStream]);
 
     // Unread messages indicator logic
     useEffect(() => {
@@ -265,16 +270,20 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                 speakingSockets.has(mySocketId) ? "border-emerald-500 shadow-lg shadow-emerald-500/20" : "border-neutral-800"
                             }`}
                         >
-                            {!isCameraOff && (localStream || screenStream) ? (
-                                <video
-                                    ref={localVideoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    className={`w-full h-full object-cover ${isScreenSharing ? "" : "-scale-x-100"}`}
-                                />
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                            {/* Always keep video element mounted to preserve srcObject across camera toggles */}
+                            <video
+                                ref={localVideoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                className={`w-full h-full object-cover ${isScreenSharing ? "" : "-scale-x-100"} ${
+                                    isCameraOff ? "hidden" : "block"
+                                }`}
+                            />
+
+                            {/* Shown only when camera is off */}
+                            {isCameraOff && (
+                                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-neutral-900">
                                     <Avatar className="h-16 w-16 border-2 border-neutral-700">
                                         <AvatarImage src={user?.image} />
                                         <AvatarFallback className="bg-neutral-800 text-xl font-bold text-neutral-300">

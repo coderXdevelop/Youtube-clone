@@ -25,9 +25,36 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "yt3.googleusercontent.com",
       },
+      {
+        // Render.com deployment backend
+        protocol: "https",
+        hostname: "*.onrender.com",
+      },
+      {
+        // Local development backend
+        protocol: "http",
+        hostname: "localhost",
+        port: "5000",
+      },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Cross-Origin-Embedder-Policy",
+            value: "unsafe-none",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+        ],
+      },
+    ];
   },
 };
 
 export default nextConfig;
-
