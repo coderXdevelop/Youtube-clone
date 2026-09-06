@@ -143,11 +143,9 @@ export const login = async (req, res) => {
             isNewLocation = !knownCities.has(locationMeta.city.toLowerCase());
         }
 
-        const isUnfamiliarLogin =
-            !activeTrustedDevice &&
-            (isNewBrowser || isNewDevice || isNewIp || isNewLocation || previousLogins.length === 0);
+        const isUnfamiliarLogin = !activeTrustedDevice;
 
-        // If unfamiliar login detected: Trigger OTP Verification challenge
+        // If unfamiliar/untrusted device detected: Trigger OTP Verification challenge
         if (isUnfamiliarLogin) {
             const otpCode = generateOtp();
             const challengeId = `chal_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
@@ -158,7 +156,7 @@ export const login = async (req, res) => {
             if (isNewDevice) reasons.push(`New device (${uaMeta.os} ${uaMeta.deviceType})`);
             if (isNewIp) reasons.push(`New IP address (${ipAddress})`);
             if (isNewLocation) reasons.push(`New location (${locationMeta.city}, ${locationMeta.state})`);
-            const reasonString = reasons.join(", ") || "Unrecognized login environment";
+            const reasonString = reasons.join(", ") || `Untrusted device (${uaMeta.browser} on ${uaMeta.os})`;
 
             const loginMeta = {
                 ipaddress: ipAddress,
@@ -213,19 +211,24 @@ export const login = async (req, res) => {
             console.log(`[SECURITY] OTP Challenge generated for ${email}: ${otpCode} (Reason: ${reasonString})`);
 
             // Dispatch transactional security OTP email via Brevo
-            sendSecurityOtpEmail({
-                toEmail: email,
-                userName: existingUser.name || email.split("@")[0],
-                otpCode,
-                reason: reasonString,
-                deviceInfo: {
-                    browser: uaMeta.browser,
-                    os: uaMeta.os,
-                    deviceType: uaMeta.deviceType,
-                    ip: ipAddress,
-                    location: `${locationMeta.city}, ${locationMeta.state}, ${locationMeta.country}`,
-                },
-            }).catch((err) => console.warn("Background OTP email dispatch warning:", err.message));
+            try {
+                const emailRes = await sendSecurityOtpEmail({
+                    toEmail: email,
+                    userName: existingUser.name || email.split("@")[0],
+                    otpCode,
+                    reason: reasonString,
+                    deviceInfo: {
+                        browser: uaMeta.browser,
+                        os: uaMeta.os,
+                        deviceType: uaMeta.deviceType,
+                        ip: ipAddress,
+                        location: `${locationMeta.city}, ${locationMeta.state}, ${locationMeta.country}`,
+                    },
+                });
+                console.log(`[SECURITY] OTP Email dispatched to ${email}:`, emailRes);
+            } catch (emailErr) {
+                console.warn(`[SECURITY] Background OTP email dispatch error:`, emailErr.message);
+            }
 
             return res.status(200).json({
                 requiresOtp: true,
