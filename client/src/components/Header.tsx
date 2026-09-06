@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Mic, Search, User, VideoIcon, ShieldCheck, Sun, Moon } from "lucide-react";
+import { Menu, Mic, Search, User, VideoIcon, ShieldCheck, Sun, Moon, Clock } from "lucide-react";
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import Link from "next/link";
@@ -26,7 +26,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
     const { user, logout, handlegooglesignin } = useUser();
-    const { theme, setThemePreference, toggleSidebar: envToggleSidebar } = useEnvironment();
+    const { theme, themePreference, setThemePreference, toggleSidebar: envToggleSidebar } = useEnvironment();
     const isLight = theme === "light";
     const pathname = usePathname();
     const isHomePage = pathname === "/";
@@ -201,13 +201,22 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                    onClick={() => setThemePreference(theme === "dark" ? "light" : "dark", user?._id)}
+                                    onClick={() => {
+                                        const nextPref = themePreference === "auto" ? "light" : themePreference === "light" ? "dark" : "auto";
+                                        setThemePreference(nextPref, user?._id);
+                                    }}
                                     className="cursor-pointer"
                                 >
                                     <div className="flex items-center justify-between w-full">
                                         <span className="flex items-center gap-2 text-xs">
-                                            {theme === "dark" ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-purple-500" />}
-                                            Theme: <span className="capitalize font-semibold">{theme}</span>
+                                            {themePreference === "auto" ? (
+                                                <Clock className="w-4 h-4 text-indigo-500" />
+                                            ) : theme === "dark" ? (
+                                                <Moon className="w-4 h-4 text-purple-500" />
+                                            ) : (
+                                                <Sun className="w-4 h-4 text-amber-500" />
+                                            )}
+                                            Theme: <span className="capitalize font-semibold">{themePreference === "auto" ? `Auto (${theme})` : themePreference}</span>
                                         </span>
                                     </div>
                                 </DropdownMenuItem>
@@ -219,14 +228,34 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
                         </DropdownMenu>
                     </>
                 ) : (
-                    <Button
-                        size="sm"
-                        className="flex items-center gap-1.5 text-xs h-8 sm:h-9 px-2.5 sm:px-3.5"
-                        onClick={handlegooglesignin}
-                    >
-                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span>Sign in</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-8 h-8 rounded-full cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800"
+                            title={`Current Theme: ${themePreference === "auto" ? `Auto (${theme})` : themePreference}`}
+                            onClick={() => {
+                                const nextPref = themePreference === "auto" ? "light" : themePreference === "light" ? "dark" : "auto";
+                                setThemePreference(nextPref);
+                            }}
+                        >
+                            {themePreference === "auto" ? (
+                                <Clock className="w-4 h-4 text-indigo-500" />
+                            ) : theme === "dark" ? (
+                                <Moon className="w-4 h-4 text-purple-400" />
+                            ) : (
+                                <Sun className="w-4 h-4 text-amber-500" />
+                            )}
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="flex items-center gap-1.5 text-xs h-8 sm:h-9 px-2.5 sm:px-3.5"
+                            onClick={handlegooglesignin}
+                        >
+                            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span>Sign in</span>
+                        </Button>
+                    </div>
                 )}
             </div>
 

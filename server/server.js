@@ -21,6 +21,7 @@ import { setupMeetingSocket } from "./socket/meetingHandler.js";
 connectToDB();
 
 const app = express();
+app.set("trust proxy", true);
 const server = http.createServer(app);
 
 const allowedOrigins = Array.from(new Set([

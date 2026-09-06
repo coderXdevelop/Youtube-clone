@@ -4,6 +4,7 @@ import path from "path";
 import DownloadRecord from "../model/downloadRecord.js";
 import User from "../model/user.js";
 import video from "../model/video.js";
+import { parseUserAgent, getClientIp } from "../utils/securityUtils.js";
 
 // Plan limits definition
 export const PLAN_LIMITS = {
@@ -39,32 +40,13 @@ const getActiveUserPlan = (userDoc) => {
  */
 const parseClientInfo = (req) => {
     const userAgent = req.headers["user-agent"] || "";
-    let browser = "Unknown Browser";
-    let deviceinfo = "Desktop Device";
+    const uaMeta = parseUserAgent(userAgent);
+    const ipaddress = getClientIp(req);
 
-    if (/mobile/i.test(userAgent)) {
-        deviceinfo = "Mobile Device";
-    } else if (/tablet|ipad/i.test(userAgent)) {
-        deviceinfo = "Tablet Device";
-    }
-
-    if (/chrome|crios/i.test(userAgent) && !/edge|opr\//i.test(userAgent)) {
-        browser = "Chrome";
-    } else if (/firefox|fxios/i.test(userAgent)) {
-        browser = "Firefox";
-    } else if (/safari/i.test(userAgent) && !/chrome|crios/i.test(userAgent)) {
-        browser = "Safari";
-    } else if (/edg/i.test(userAgent)) {
-        browser = "Edge";
-    } else if (/opr\//i.test(userAgent)) {
-        browser = "Opera";
-    }
-
-    const ipaddress =
-        req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-        req.socket?.remoteAddress ||
-        req.ip ||
-        "127.0.0.1";
+    const browser = uaMeta.browserVersion && uaMeta.browserVersion !== "124"
+        ? `${uaMeta.browser} ${uaMeta.browserVersion}`
+        : uaMeta.browser;
+    const deviceinfo = `${uaMeta.deviceType} (${uaMeta.os})`;
 
     return { browser, deviceinfo, ipaddress };
 };

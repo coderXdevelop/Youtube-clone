@@ -31,11 +31,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-gray-900 dark:text-gray-100 transition-colors">
-        <UserProvider>
-          <EnvironmentProvider>
+        <EnvironmentProvider>
+          <UserProvider>
             <AppShell>{children}</AppShell>
-          </EnvironmentProvider>
-        </UserProvider>
+          </UserProvider>
+        </EnvironmentProvider>
       </body>
     </html>
   );

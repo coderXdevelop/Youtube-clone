@@ -1,10 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import axiosInstance from "./AxiosInstance";
 
-type ThemeMode = "light" | "dark";
-type ThemePreference = "auto" | "light" | "dark";
+export type ThemeMode = "light" | "dark";
+export type ThemePreference = "auto" | "light" | "dark";
 
 type EnvironmentContextType = {
     theme: ThemeMode;
@@ -31,73 +31,117 @@ const EnvironmentContext = createContext<EnvironmentContextType>({
 });
 
 /**
- * Calculate IST (UTC+5:30) time and determine light theme if 5:00 AM - 12:00 PM IST
+ * Calculate IST (UTC+5:30) time and determine light theme if 5:00 AM - 12:00 PM IST,
+ * otherwise dark theme. Falls back to system preference if time calculation is unavailable.
  */
 export const computeCurrentIstTheme = (): ThemeMode => {
-    const now = new Date();
-    const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-    const istTime = new Date(utcTime + 330 * 60000);
+    try {
+        const now = new Date();
+        const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+        const istTime = new Date(utcTime + 330 * 60000);
 
-    const istHours = istTime.getHours();
-    const istMinutes = istTime.getMinutes();
-    const totalMinutes = istHours * 60 + istMinutes;
+        const istHours = istTime.getHours();
+        const istMinutes = istTime.getMinutes();
+        const totalMinutes = istHours * 60 + istMinutes;
 
-    // 5:00 AM = 300 mins, 12:00 PM = 720 mins
-    return totalMinutes >= 300 && totalMinutes <= 720 ? "light" : "dark";
+        // 5:00 AM = 300 mins, 12:00 PM = 720 mins IST
+        return totalMinutes >= 300 && totalMinutes <= 720 ? "light" : "dark";
+    } catch {
+        if (typeof window !== "undefined" && window.matchMedia) {
+            return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        return "dark";
+    }
+};
+
+const applyDomTheme = (mode: ThemeMode) => {
+    if (typeof document !== "undefined") {
+        if (mode === "dark") {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
+    }
 };
 
 export const EnvironmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [themePreference, setThemePreferenceState] = useState<ThemePreference>("auto");
-    const [theme, setThemeState] = useState<ThemeMode>("light");
+    const [theme, setThemeState] = useState<ThemeMode>("dark");
     const [isSidebarOpen, setSidebarOpen] = useState(true);
 
     const toggleSidebar = () => setSidebarOpen((prev) => !prev);
     const closeSidebar = () => setSidebarOpen(false);
 
-    // Initialize from local storage or calculate IST time
-    useEffect(() => {
+    const updateThemeStateAndDom = useCallback((newMode: ThemeMode) => {
+        setThemeState(newMode);
+        applyDomTheme(newMode);
         if (typeof window !== "undefined") {
-            const savedPref = (localStorage.getItem("yt_theme_pref") as ThemePreference) || "auto";
-            const savedTheme = localStorage.getItem("yt_theme") as ThemeMode;
-
-            setThemePreferenceState(savedPref);
-
-            if (savedPref === "auto") {
-                const istTheme = computeCurrentIstTheme();
-                setThemeState(istTheme);
-                document.documentElement.classList.toggle("dark", istTheme === "dark");
-            } else if (savedTheme) {
-                setThemeState(savedTheme);
-                document.documentElement.classList.toggle("dark", savedTheme === "dark");
-            } else {
-                setThemeState(savedPref);
-                document.documentElement.classList.toggle("dark", savedPref === "dark");
-            }
+            localStorage.setItem("yt_theme", newMode);
         }
     }, []);
 
-    const setTheme = (newTheme: ThemeMode) => {
-        setThemeState(newTheme);
-        if (typeof window !== "undefined") {
-            localStorage.setItem("yt_theme", newTheme);
-            document.documentElement.classList.toggle("dark", newTheme === "dark");
+    // Re-evaluate theme based on current preference
+    const evaluateAndApplyTheme = useCallback((pref: ThemePreference) => {
+        let targetTheme: ThemeMode;
+        if (pref === "auto") {
+            targetTheme = computeCurrentIstTheme();
+        } else {
+            targetTheme = pref;
         }
+        updateThemeStateAndDom(targetTheme);
+    }, [updateThemeStateAndDom]);
+
+    // Initialize from localStorage on mount
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const savedPref = (localStorage.getItem("yt_theme_pref") as ThemePreference) || "auto";
+            setThemePreferenceState(savedPref);
+            evaluateAndApplyTheme(savedPref);
+        }
+    }, [evaluateAndApplyTheme]);
+
+    // Periodically re-evaluate "auto" theme (every 60s) or on system theme change
+    useEffect(() => {
+        if (themePreference !== "auto") return;
+
+        const interval = setInterval(() => {
+            evaluateAndApplyTheme("auto");
+        }, 60000);
+
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const handleSystemThemeChange = () => {
+            evaluateAndApplyTheme("auto");
+        };
+
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener("change", handleSystemThemeChange);
+        }
+
+        return () => {
+            clearInterval(interval);
+            if (mediaQuery.removeEventListener) {
+                mediaQuery.removeEventListener("change", handleSystemThemeChange);
+            }
+        };
+    }, [themePreference, evaluateAndApplyTheme]);
+
+    // Explicit manual theme override (e.g., from quick header toggle)
+    const setTheme = (newTheme: ThemeMode) => {
+        setThemePreferenceState(newTheme);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("yt_theme_pref", newTheme);
+        }
+        updateThemeStateAndDom(newTheme);
     };
 
+    // Full theme preference setter (supports "auto", "light", "dark") with optional backend sync
     const setThemePreference = async (pref: ThemePreference, userId?: string) => {
         setThemePreferenceState(pref);
         if (typeof window !== "undefined") {
             localStorage.setItem("yt_theme_pref", pref);
         }
 
-        let effectiveTheme: ThemeMode = "light";
-        if (pref === "auto") {
-            effectiveTheme = computeCurrentIstTheme();
-        } else {
-            effectiveTheme = pref;
-        }
-
-        setTheme(effectiveTheme);
+        evaluateAndApplyTheme(pref);
 
         if (userId) {
             try {
@@ -111,13 +155,14 @@ export const EnvironmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }
     };
 
+    // Called when user logs in with backend theme info
     const applyLoginTheme = (loginTheme: ThemeMode, preference: ThemePreference = "auto") => {
         setThemePreferenceState(preference);
-        setTheme(loginTheme);
         if (typeof window !== "undefined") {
             localStorage.setItem("yt_theme_pref", preference);
-            localStorage.setItem("yt_theme", loginTheme);
         }
+        const effectiveTheme = preference === "auto" ? computeCurrentIstTheme() : loginTheme;
+        updateThemeStateAndDom(effectiveTheme);
     };
 
     return (
