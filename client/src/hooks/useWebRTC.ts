@@ -67,6 +67,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
+    const isMutedRef = useRef(false);
+    const isCameraOffRef = useRef(false);
+    const isStreamInitializingRef = useRef(false);
+
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -110,6 +114,9 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     // Initialize local media stream
     const initLocalStream = useCallback(
         async (customVideoDeviceId?: string, customAudioDeviceId?: string, customFacingMode?: "user" | "environment") => {
+            if (isStreamInitializingRef.current) return localStreamRef.current;
+            isStreamInitializingRef.current = true;
+
             try {
                 if (localStreamRef.current) {
                     localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -129,6 +136,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 };
 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Apply current mute and camera off preferences to newly acquired tracks
+                stream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                stream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
+
                 localStreamRef.current = stream;
                 setLocalStream(stream);
 
@@ -152,38 +164,49 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                         video: true,
                         audio: { echoCancellation: true, noiseSuppression: true },
                     });
+
+                    basicStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                    basicStream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
+
                     localStreamRef.current = basicStream;
                     setLocalStream(basicStream);
-                    setIsCameraOff(false);
                     await enumerateDevices();
                     return basicStream;
                 } catch (basicErr) {
-                    console.warn("Video source unreadable or in use by another app, falling back to audio-only mode:", basicErr);
+                    console.warn("Video source unreadable, falling back to audio-only mode:", basicErr);
                     try {
                         const audioStream = await navigator.mediaDevices.getUserMedia({
                             audio: { echoCancellation: true, noiseSuppression: true },
                             video: false,
                         });
+
+                        audioStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+
                         localStreamRef.current = audioStream;
                         setLocalStream(audioStream);
                         setIsCameraOff(true);
+                        isCameraOffRef.current = true;
                         return audioStream;
                     } catch (audioErr) {
                         console.error("Camera and Microphone permission denied:", audioErr);
                         setIsCameraOff(true);
+                        isCameraOffRef.current = true;
                         setIsMuted(true);
+                        isMutedRef.current = true;
                         return null;
                     }
                 }
+            } finally {
+                isStreamInitializingRef.current = false;
             }
         },
         [facingMode, enumerateDevices]
     );
 
-    // Automatically initialize local stream on hook mount for pre-join lobby preview
+    // Initialize local stream once on hook mount
     useEffect(() => {
         initLocalStream();
-    }, [initLocalStream]);
+    }, []);
     useEffect(() => {
         if (!localStream) return;
         try {
@@ -300,66 +323,32 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     }, []);
 
     // Toggle Audio Mute
-    const toggleMute = useCallback(async (forceVal?: boolean) => {
-        const targetMutedState = forceVal !== undefined ? forceVal : !isMuted;
-        let stream = localStreamRef.current;
-        let audioTrack = stream?.getAudioTracks()?.[0];
+    const toggleMute = useCallback((forceVal?: boolean) => {
+        setIsMuted((prevMuted) => {
+            const targetMutedState = forceVal !== undefined ? forceVal : !prevMuted;
+            isMutedRef.current = targetMutedState;
 
-        // If no live audio track exists, re-fetch audio track
-        if (!audioTrack || audioTrack.readyState === "ended") {
-            try {
-                const newAudStream = await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-                    video: false,
+            if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach((track) => {
+                    track.enabled = !targetMutedState;
                 });
-                const newAudioTrack = newAudStream.getAudioTracks()[0];
+            }
 
-                if (stream) {
-                    const activeStream = stream;
-                    activeStream.getAudioTracks().forEach((t) => {
-                        t.stop();
-                        activeStream.removeTrack(t);
-                    });
-                    activeStream.addTrack(newAudioTrack);
-                } else {
-                    stream = new MediaStream([newAudioTrack]);
-                    localStreamRef.current = stream;
-                }
-                audioTrack = newAudioTrack;
-
-                peerConnectionsRef.current.forEach((pc) => {
-                    const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-                    if (sender) {
-                        sender.replaceTrack(newAudioTrack);
-                    } else if (stream) {
-                        pc.addTrack(newAudioTrack, stream);
+            peerConnectionsRef.current.forEach((pc) => {
+                pc.getSenders().forEach((sender) => {
+                    if (sender.track?.kind === "audio") {
+                        sender.track.enabled = !targetMutedState;
                     }
                 });
-            } catch (err) {
-                console.error("Could not re-acquire audio track:", err);
-                setIsMuted(true);
-                return;
-            }
-        }
+            });
 
-        audioTrack.enabled = !targetMutedState;
-        setIsMuted(targetMutedState);
-
-        peerConnectionsRef.current.forEach((pc) => {
-            const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-            if (sender && sender.track) {
-                sender.track.enabled = !targetMutedState;
+            if (socketRef.current && roomId) {
+                socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
             }
+
+            return targetMutedState;
         });
-
-        if (stream) {
-            setLocalStream(new MediaStream(stream.getTracks()));
-        }
-
-        if (socketRef.current && roomId) {
-            socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
-        }
-    }, [isMuted, roomId]);
+    }, [roomId]);
 
     // Join room function
     const joinRoom = useCallback(async () => {
@@ -507,66 +496,32 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, onKicked, onCallEnded, leaveRoom, toggleMute]);
 
     // Toggle Camera On/Off
-    const toggleCamera = useCallback(async (forceVal?: boolean) => {
-        const targetCameraOffState = forceVal !== undefined ? forceVal : !isCameraOff;
-        let stream = localStreamRef.current;
-        let videoTrack = stream?.getVideoTracks()?.[0];
+    const toggleCamera = useCallback((forceVal?: boolean) => {
+        setIsCameraOff((prevCameraOff) => {
+            const targetCameraOffState = forceVal !== undefined ? forceVal : !prevCameraOff;
+            isCameraOffRef.current = targetCameraOffState;
 
-        // If no live video track exists, re-fetch video track
-        if (!videoTrack || videoTrack.readyState === "ended") {
-            try {
-                const newVidStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode },
-                    audio: false,
+            if (localStreamRef.current) {
+                localStreamRef.current.getVideoTracks().forEach((track) => {
+                    track.enabled = !targetCameraOffState;
                 });
-                const newVideoTrack = newVidStream.getVideoTracks()[0];
+            }
 
-                if (stream) {
-                    const activeStream = stream;
-                    activeStream.getVideoTracks().forEach((t) => {
-                        t.stop();
-                        activeStream.removeTrack(t);
-                    });
-                    activeStream.addTrack(newVideoTrack);
-                } else {
-                    stream = new MediaStream([newVideoTrack]);
-                    localStreamRef.current = stream;
-                }
-                videoTrack = newVideoTrack;
-
-                peerConnectionsRef.current.forEach((pc) => {
-                    const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-                    if (sender) {
-                        sender.replaceTrack(newVideoTrack);
-                    } else if (stream) {
-                        pc.addTrack(newVideoTrack, stream);
+            peerConnectionsRef.current.forEach((pc) => {
+                pc.getSenders().forEach((sender) => {
+                    if (sender.track?.kind === "video") {
+                        sender.track.enabled = !targetCameraOffState;
                     }
                 });
-            } catch (err) {
-                console.error("Could not re-acquire video track:", err);
-                setIsCameraOff(true);
-                return;
-            }
-        }
+            });
 
-        videoTrack.enabled = !targetCameraOffState;
-        setIsCameraOff(targetCameraOffState);
-
-        peerConnectionsRef.current.forEach((pc) => {
-            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-            if (sender && sender.track) {
-                sender.track.enabled = !targetCameraOffState;
+            if (socketRef.current && roomId) {
+                socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
             }
+
+            return targetCameraOffState;
         });
-
-        if (stream) {
-            setLocalStream(new MediaStream(stream.getTracks()));
-        }
-
-        if (socketRef.current && roomId) {
-            socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
-        }
-    }, [isCameraOff, roomId, facingMode]);
+    }, [roomId]);
 
     // Switch Camera (Front/Rear on Mobile)
     const switchCamera = useCallback(async () => {
