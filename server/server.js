@@ -47,7 +47,12 @@ app.use(cors({
 app.use(express.json());
 app.use(bodyParser.json({ limit: "50mb", extended: true }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+}, express.static("uploads"));
 
 app.use("/api/user", authRoute);
 app.use("/api/video", videoRoute);
