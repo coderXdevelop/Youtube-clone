@@ -391,19 +391,25 @@ export const verifySubscriptionPayment = async (req, res) => {
             status: "PAID",
         };
 
-        // Dispatch subscription purchase invoice email via Brevo asynchronously
-        if (transaction.useremail) {
-            sendSubscriptionInvoiceEmail({
-                toEmail: transaction.useremail,
-                customerName: transaction.username || updatedUser?.name,
-                invoiceNumber: transaction.invoicenumber,
-                plan: transaction.plan,
-                billingcycle: transaction.billingcycle,
-                amount: transaction.amount,
-                currency: transaction.currency || "INR",
-                paymentId: generatedPaymentId,
-                date: transaction.subscriptionstart,
-            }).catch((err) => console.warn("Background invoice email dispatch warning:", err.message));
+        // Dispatch subscription purchase invoice email via Brevo
+        const targetEmail = transaction.useremail || updatedUser?.email;
+        if (targetEmail) {
+            try {
+                const invoiceRes = await sendSubscriptionInvoiceEmail({
+                    toEmail: targetEmail,
+                    customerName: transaction.username || updatedUser?.name || "Subscriber",
+                    invoiceNumber: transaction.invoicenumber,
+                    plan: transaction.plan,
+                    billingcycle: transaction.billingcycle,
+                    amount: transaction.amount,
+                    currency: transaction.currency || "INR",
+                    paymentId: generatedPaymentId,
+                    date: transaction.subscriptionstart || new Date(),
+                });
+                console.log(`[SUBSCRIPTION] Invoice email dispatched to ${targetEmail}:`, invoiceRes);
+            } catch (emailErr) {
+                console.warn(`[SUBSCRIPTION] Invoice email dispatch error:`, emailErr.message);
+            }
         }
 
         return res.status(200).json({
