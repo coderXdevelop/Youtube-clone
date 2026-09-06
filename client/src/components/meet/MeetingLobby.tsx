@@ -51,9 +51,17 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
     const [passcode, setPasscode] = useState("");
 
     useEffect(() => {
-        if (videoRef.current && localStream) {
-            videoRef.current.srcObject = localStream;
-            videoRef.current.play().catch(() => {});
+        const video = videoRef.current;
+        if (!video) return;
+        if (localStream) {
+            if (video.srcObject !== localStream) {
+                video.srcObject = localStream;
+            }
+            if (!isCameraOff) {
+                video.play().catch(() => {});
+            }
+        } else {
+            video.srcObject = null;
         }
     }, [localStream, isCameraOff]);
 
@@ -63,16 +71,18 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                 {/* Video Preview Box */}
                 <div className="lg:col-span-7 flex flex-col items-center gap-4">
                     <div className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 shadow-2xl flex items-center justify-center">
-                        {!isCameraOff && localStream ? (
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover -scale-x-100"
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center gap-3">
+                        {/* Always keep video mounted so srcObject is preserved across camera toggles */}
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className={`w-full h-full object-cover -scale-x-100 ${isCameraOff ? "hidden" : "block"}`}
+                        />
+
+                        {/* Avatar overlay when camera is off */}
+                        {isCameraOff && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-900">
                                 <Avatar className="h-24 w-24 border-2 border-neutral-700 shadow-lg">
                                     <AvatarImage src={user?.image} />
                                     <AvatarFallback className="bg-neutral-800 text-2xl font-bold text-neutral-300">

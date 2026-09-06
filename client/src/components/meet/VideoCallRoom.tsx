@@ -129,13 +129,17 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         const video = localVideoRef.current;
         if (!video) return;
         const nextStream = screenStream || localStream;
-        if (nextStream && video.srcObject !== nextStream) {
-            video.srcObject = nextStream;
-            video.play().catch(() => {});
-        } else if (!nextStream) {
+        if (nextStream) {
+            if (video.srcObject !== nextStream) {
+                video.srcObject = nextStream;
+            }
+            if (!isCameraOff) {
+                video.play().catch(() => {});
+            }
+        } else {
             video.srcObject = null;
         }
-    }, [localStream, screenStream]);
+    }, [localStream, screenStream, isCameraOff]);
 
     // Unread messages indicator logic
     useEffect(() => {

@@ -324,30 +324,27 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
     // Toggle Audio Mute
     const toggleMute = useCallback((forceVal?: boolean) => {
-        setIsMuted((prevMuted) => {
-            const targetMutedState = forceVal !== undefined ? forceVal : !prevMuted;
-            isMutedRef.current = targetMutedState;
+        const targetMutedState = forceVal !== undefined ? forceVal : !isMutedRef.current;
+        isMutedRef.current = targetMutedState;
+        setIsMuted(targetMutedState);
 
-            if (localStreamRef.current) {
-                localStreamRef.current.getAudioTracks().forEach((track) => {
-                    track.enabled = !targetMutedState;
-                });
-            }
-
-            peerConnectionsRef.current.forEach((pc) => {
-                pc.getSenders().forEach((sender) => {
-                    if (sender.track?.kind === "audio") {
-                        sender.track.enabled = !targetMutedState;
-                    }
-                });
+        if (localStreamRef.current) {
+            localStreamRef.current.getAudioTracks().forEach((track) => {
+                track.enabled = !targetMutedState;
             });
+        }
 
-            if (socketRef.current && roomId) {
-                socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
-            }
-
-            return targetMutedState;
+        peerConnectionsRef.current.forEach((pc) => {
+            pc.getSenders().forEach((sender) => {
+                if (sender.track?.kind === "audio") {
+                    sender.track.enabled = !targetMutedState;
+                }
+            });
         });
+
+        if (socketRef.current && roomId) {
+            socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
+        }
     }, [roomId]);
 
     // Join room function
@@ -497,30 +494,27 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
     // Toggle Camera On/Off
     const toggleCamera = useCallback((forceVal?: boolean) => {
-        setIsCameraOff((prevCameraOff) => {
-            const targetCameraOffState = forceVal !== undefined ? forceVal : !prevCameraOff;
-            isCameraOffRef.current = targetCameraOffState;
+        const targetCameraOffState = forceVal !== undefined ? forceVal : !isCameraOffRef.current;
+        isCameraOffRef.current = targetCameraOffState;
+        setIsCameraOff(targetCameraOffState);
 
-            if (localStreamRef.current) {
-                localStreamRef.current.getVideoTracks().forEach((track) => {
-                    track.enabled = !targetCameraOffState;
-                });
-            }
-
-            peerConnectionsRef.current.forEach((pc) => {
-                pc.getSenders().forEach((sender) => {
-                    if (sender.track?.kind === "video") {
-                        sender.track.enabled = !targetCameraOffState;
-                    }
-                });
+        if (localStreamRef.current) {
+            localStreamRef.current.getVideoTracks().forEach((track) => {
+                track.enabled = !targetCameraOffState;
             });
+        }
 
-            if (socketRef.current && roomId) {
-                socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
-            }
-
-            return targetCameraOffState;
+        peerConnectionsRef.current.forEach((pc) => {
+            pc.getSenders().forEach((sender) => {
+                if (sender.track?.kind === "video") {
+                    sender.track.enabled = !targetCameraOffState;
+                }
+            });
         });
+
+        if (socketRef.current && roomId) {
+            socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
+        }
     }, [roomId]);
 
     // Switch Camera (Front/Rear on Mobile)
