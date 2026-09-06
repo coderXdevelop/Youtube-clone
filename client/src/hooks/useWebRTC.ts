@@ -47,11 +47,28 @@ interface UseWebRTCOptions {
     onCallEnded?: () => void;
 }
 
+// STUN + Open Relay TURN — enables cross-network connections (mobile ↔ desktop, different carriers)
+// Open Relay is free for development; replace with paid credentials for production.
 const ICE_SERVERS = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:openrelay.metered.ca:80" },
+        {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
+        {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+        },
     ],
 };
 
@@ -61,6 +78,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const screenStreamRef = useRef<MediaStream | null>(null);
     const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
     const audioAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; dataArray: Uint8Array }>>(new Map());
+    // Track reconnect attempts for mobile network drops
+    const reconnectAttemptsRef = useRef(0);
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    const isReconnectingRef = useRef(false);
 
     const [participants, setParticipants] = useState<Map<string, Participant>>(new Map());
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -283,10 +304,26 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 });
             };
 
-            // Monitor connection stats
+            // Monitor connection state — attempt ICE restart on failure
             pc.onconnectionstatechange = () => {
-                if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+                if (pc.connectionState === "failed") {
                     setConnectionQuality("Poor");
+                    // Trigger ICE restart to recover the connection
+                    try {
+                        pc.restartIce();
+                        pc.createOffer({ iceRestart: true }).then((offer) => {
+                            return pc.setLocalDescription(offer);
+                        }).then(() => {
+                            socket.emit("webrtc-offer", {
+                                targetSocketId,
+                                offer: pc.localDescription,
+                            });
+                        }).catch((err) => console.warn("ICE restart offer failed:", err));
+                    } catch (err) {
+                        console.warn("ICE restart not supported:", err);
+                    }
+                } else if (pc.connectionState === "disconnected") {
+                    setConnectionQuality("Fair");
                 } else if (pc.connectionState === "connected") {
                     setConnectionQuality("Good");
                 }
@@ -347,27 +384,46 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         }
     }, [roomId]);
 
+    // Internal join helper — emits join-room on an already-connected socket
+    const emitJoinRoom = useCallback((socket: Socket) => {
+        socket.emit("join-room", { roomId, user, passcode });
+    }, [roomId, user, passcode]);
+
     // Join room function
     const joinRoom = useCallback(async () => {
         if (!user) return;
+        reconnectAttemptsRef.current = 0;
+        isReconnectingRef.current = false;
+
         const socket = io(backendUrl, {
             transports: ["websocket", "polling"],
-            reconnectionAttempts: 5,
+            reconnection: true,
+            reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+            reconnectionDelay: 1500,
         });
 
         socketRef.current = socket;
 
         socket.on("connect", async () => {
             setMySocketId(socket.id!);
+            reconnectAttemptsRef.current = 0;
             if (!localStreamRef.current) {
                 await initLocalStream();
             }
+            emitJoinRoom(socket);
+        });
 
-            socket.emit("join-room", {
-                roomId,
-                user,
-                passcode,
-            });
+        // Auto-reconnect: re-join room on socket reconnect (handles mobile network drops)
+        socket.on("reconnect", () => {
+            if (isReconnectingRef.current) return;
+            isReconnectingRef.current = true;
+            reconnectAttemptsRef.current += 1;
+            // Re-establish peer connections after socket reconnect
+            peerConnectionsRef.current.forEach((pc) => pc.close());
+            peerConnectionsRef.current.clear();
+            setParticipants(new Map());
+            emitJoinRoom(socket);
+            isReconnectingRef.current = false;
         });
 
         socket.on("room-joined", async ({ yourSocketId, isHost: hostStatus, isCoHost: coHostStatus, settings, existingParticipants }) => {

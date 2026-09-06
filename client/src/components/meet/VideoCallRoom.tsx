@@ -14,12 +14,10 @@ import {
     Copy,
     Check,
     Lock,
-    Unlock,
     Shield,
     Circle,
     Square,
     Paperclip,
-    Smile,
     Send,
     UserX,
     VolumeX,
@@ -95,6 +93,9 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     const [chatInputText, setChatInputText] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
     const [spotlightSocketId, setSpotlightSocketId] = useState<string | null>(null);
+
+    // Detect if screen sharing is available (not on mobile browsers)
+    const canScreenShare = typeof window !== "undefined" && typeof navigator?.mediaDevices?.getDisplayMedia === "function";
 
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -586,122 +587,101 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                 )}
             </div>
 
-            {/* Bottom Controls Toolbar */}
-            <footer className="h-auto min-h-[56px] sm:h-16 bg-neutral-900 border-t border-neutral-800 px-2 sm:px-4 py-2 sm:py-0 flex items-center justify-between shrink-0 z-30">
-                {/* Left side recorder controls */}
-                <div className="flex items-center gap-1 sm:gap-2">
-                    {isRecording ? (
-                        <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-800 text-red-300 px-2 sm:px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
-                            <Circle className="w-3 h-3 fill-red-500 text-red-500" />
-                            <span className="hidden sm:inline">REC</span>
-                            <span>{formatTime(recordingTime)}</span>
+            {/* Bottom Controls Toolbar — 2 rows on mobile, 1 row on sm+ */}
+            <footer className="bg-neutral-900 border-t border-neutral-800 shrink-0 z-30 px-2 sm:px-4">
+                {/* Mobile: Row 1 — primary call controls */}
+                <div className="flex sm:hidden items-center justify-between py-2 gap-1">
+                    {/* Left: Record */}
+                    <div className="flex items-center">
+                        {isRecording ? (
+                            <div className="flex items-center gap-1 bg-red-950/80 border border-red-800 text-red-300 px-2 py-1.5 rounded-full text-xs font-semibold animate-pulse">
+                                <Circle className="w-3 h-3 fill-red-500 text-red-500" />
+                                <span>{formatTime(recordingTime)}</span>
+                                <button onClick={stopRecording} className="ml-1 text-white">
+                                    <Square className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ) : (
                             <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={stopRecording}
-                                className="h-5 px-1 text-white hover:text-red-200"
+                                variant="secondary"
+                                size="icon"
+                                onClick={startRecording}
+                                className="h-9 w-9 bg-neutral-800 hover:bg-neutral-700 text-white rounded-full cursor-pointer"
+                                title="Record"
                             >
-                                <Square className="w-3.5 h-3.5" />
+                                <Circle className="w-3.5 h-3.5 text-red-500 fill-red-500" />
                             </Button>
-                        </div>
-                    ) : (
+                        )}
+                    </div>
+
+                    {/* Center: Mic / Cam / SwitchCam / Hand */}
+                    <div className="flex items-center gap-1.5">
+                        <Button
+                            variant={isMuted ? "destructive" : "secondary"}
+                            size="icon"
+                            onClick={onToggleMute}
+                            className="rounded-full h-10 w-10 cursor-pointer"
+                            title={isMuted ? "Unmute" : "Mute"}
+                        >
+                            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                            variant={isCameraOff ? "destructive" : "secondary"}
+                            size="icon"
+                            onClick={onToggleCamera}
+                            className="rounded-full h-10 w-10 cursor-pointer"
+                            title={isCameraOff ? "Camera On" : "Camera Off"}
+                        >
+                            {isCameraOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
+                        </Button>
                         <Button
                             variant="secondary"
                             size="icon"
-                            onClick={startRecording}
-                            className="h-9 w-9 sm:w-auto sm:px-3 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
-                            title="Start Call Recording"
+                            onClick={onSwitchCamera}
+                            className="rounded-full h-10 w-10 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer"
+                            title="Switch Camera"
                         >
-                            <Circle className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                            <span className="hidden sm:inline">Record</span>
+                            <SwitchCamera className="w-4 h-4" />
                         </Button>
-                    )}
-                </div>
+                        <Button
+                            variant={isHandRaised ? "default" : "secondary"}
+                            size="icon"
+                            onClick={onToggleRaiseHand}
+                            className={`rounded-full h-10 w-10 cursor-pointer ${
+                                isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                            }`}
+                            title={isHandRaised ? "Lower Hand" : "Raise Hand"}
+                        >
+                            <Hand className="w-4 h-4" />
+                        </Button>
+                    </div>
 
-                {/* Center Control Buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-3">
-                    <Button
-                        variant={isMuted ? "destructive" : "secondary"}
-                        size="icon"
-                        onClick={onToggleMute}
-                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 cursor-pointer transition-transform hover:scale-105"
-                        title={isMuted ? "Unmute Mic" : "Mute Mic"}
-                    >
-                        {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
-                    </Button>
-
-                    <Button
-                        variant={isCameraOff ? "destructive" : "secondary"}
-                        size="icon"
-                        onClick={onToggleCamera}
-                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 cursor-pointer transition-transform hover:scale-105"
-                        title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
-                    >
-                        {isCameraOff ? <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Video className="w-4 h-4 sm:w-5 sm:h-5" />}
-                    </Button>
-
-                    <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={onSwitchCamera}
-                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105"
-                        title="Switch Front/Rear Camera"
-                    >
-                        <SwitchCamera className="w-5 h-5" />
-                    </Button>
-
-                    <Button
-                        variant={isScreenSharing ? "default" : "secondary"}
-                        size="icon"
-                        onClick={onToggleScreenShare}
-                        className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
-                            isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
-                        }`}
-                        title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
-                    >
-                        <ScreenShare className="w-5 h-5" />
-                    </Button>
-
-                    <Button
-                        variant={isHandRaised ? "default" : "secondary"}
-                        size="icon"
-                        onClick={onToggleRaiseHand}
-                        className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
-                            isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
-                        }`}
-                        title={isHandRaised ? "Lower Hand" : "Raise Hand"}
-                    >
-                        <Hand className="w-5 h-5" />
-                    </Button>
-
-                    {/* End / Leave Call Button */}
+                    {/* Right: Leave */}
                     {isHost ? (
-                        <div className="flex items-center gap-1.5 ml-1">
-                            <Button
-                                variant="destructive"
-                                size="icon"
-                                onClick={() => onSendHostControl("end-call")}
-                                className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer"
-                            >
-                                <PhoneOff className="w-4 h-4" />
-                                <span className="hidden sm:inline ml-1.5">End for All</span>
-                            </Button>
-                        </div>
+                        <Button
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => onSendHostControl("end-call")}
+                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                            title="End for All"
+                        >
+                            <PhoneOff className="w-4 h-4" />
+                        </Button>
                     ) : (
                         <Button
                             variant="destructive"
                             size="icon"
                             onClick={onLeaveCall}
-                            className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer ml-1"
+                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                            title="Leave"
                         >
                             <PhoneOff className="w-4 h-4" />
-                            <span className="hidden sm:inline ml-1.5">Leave</span>
                         </Button>
                     )}
                 </div>
 
-                {/* Right Side Drawers Toggles */}
-                <div className="flex items-center gap-2">
+                {/* Mobile: Row 2 — chat + participants always visible */}
+                <div className="flex sm:hidden items-center justify-center gap-4 pb-2 border-t border-neutral-800 pt-1.5">
                     <Button
                         variant={activeDrawer === "participants" ? "default" : "ghost"}
                         size="icon"
@@ -729,6 +709,127 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             </span>
                         )}
                     </Button>
+
+                    {canScreenShare && (
+                        <Button
+                            variant={isScreenSharing ? "default" : "ghost"}
+                            size="icon"
+                            onClick={onToggleScreenShare}
+                            className={`rounded-full h-10 w-10 cursor-pointer ${
+                                isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "text-neutral-300 hover:text-white hover:bg-neutral-800"
+                            }`}
+                            title={isScreenSharing ? "Stop Share" : "Share Screen"}
+                        >
+                            <ScreenShare className="w-5 h-5" />
+                        </Button>
+                    )}
+                </div>
+
+                {/* Desktop / Tablet: original single-row layout */}
+                <div className="hidden sm:flex h-16 items-center justify-between">
+                    {/* Left: Record */}
+                    <div className="flex items-center gap-2">
+                        {isRecording ? (
+                            <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-800 text-red-300 px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
+                                <Circle className="w-3 h-3 fill-red-500 text-red-500" />
+                                <span>REC {formatTime(recordingTime)}</span>
+                                <Button variant="ghost" size="sm" onClick={stopRecording} className="h-5 px-1 text-white hover:text-red-200">
+                                    <Square className="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={startRecording}
+                                className="h-9 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
+                                title="Start Call Recording"
+                            >
+                                <Circle className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                                <span>Record Call</span>
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Center: all controls */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <Button variant={isMuted ? "destructive" : "secondary"} size="icon" onClick={onToggleMute} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isMuted ? "Unmute Mic" : "Mute Mic"}>
+                            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                        </Button>
+                        <Button variant={isCameraOff ? "destructive" : "secondary"} size="icon" onClick={onToggleCamera} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
+                            {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                        </Button>
+                        <Button variant="secondary" size="icon" onClick={onSwitchCamera} className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105" title="Switch Camera">
+                            <SwitchCamera className="w-5 h-5" />
+                        </Button>
+                        {canScreenShare && (
+                            <Button
+                                variant={isScreenSharing ? "default" : "secondary"}
+                                size="icon"
+                                onClick={onToggleScreenShare}
+                                className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
+                                    isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                                }`}
+                                title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
+                            >
+                                <ScreenShare className="w-5 h-5" />
+                            </Button>
+                        )}
+                        <Button
+                            variant={isHandRaised ? "default" : "secondary"}
+                            size="icon"
+                            onClick={onToggleRaiseHand}
+                            className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
+                                isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                            }`}
+                            title={isHandRaised ? "Lower Hand" : "Raise Hand"}
+                        >
+                            <Hand className="w-5 h-5" />
+                        </Button>
+                        {isHost ? (
+                            <div className="flex items-center gap-1.5 ml-1">
+                                <Button variant="destructive" size="icon" onClick={() => onSendHostControl("end-call")} className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer">
+                                    <PhoneOff className="w-4 h-4" />
+                                    <span className="hidden sm:inline ml-1.5">End for All</span>
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button variant="destructive" size="icon" onClick={onLeaveCall} className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer ml-1">
+                                <PhoneOff className="w-4 h-4" />
+                                <span className="hidden sm:inline ml-1.5">Leave</span>
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Right: Participants + Chat */}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant={activeDrawer === "participants" ? "default" : "ghost"}
+                            size="icon"
+                            onClick={() => setActiveDrawer(activeDrawer === "participants" ? null : "participants")}
+                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative"
+                            title="Participants"
+                        >
+                            <Users className="w-5 h-5" />
+                            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center">
+                                {participantList.length + 1}
+                            </span>
+                        </Button>
+                        <Button
+                            variant={activeDrawer === "chat" ? "default" : "ghost"}
+                            size="icon"
+                            onClick={() => setActiveDrawer(activeDrawer === "chat" ? null : "chat")}
+                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative"
+                            title="In-Call Chat"
+                        >
+                            <MessageSquare className="w-5 h-5" />
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center">
+                                    {unreadCount}
+                                </span>
+                            )}
+                        </Button>
+                    </div>
                 </div>
             </footer>
         </div>
@@ -745,8 +846,14 @@ const RemoteVideoTile: React.FC<{
     const videoRef = useRef<HTMLVideoElement | null>(null);
 
     useEffect(() => {
-        if (videoRef.current && participant.stream) {
-            videoRef.current.srcObject = participant.stream;
+        const video = videoRef.current;
+        if (!video) return;
+        if (participant.stream) {
+            if (video.srcObject !== participant.stream) {
+                video.srcObject = participant.stream;
+            }
+            // Explicitly call play() to handle mobile browsers that need it
+            video.play().catch(() => {});
         }
     }, [participant.stream, participant.isCameraOff]);
 
@@ -780,3 +887,4 @@ const RemoteVideoTile: React.FC<{
         </div>
     );
 };
+
