@@ -324,9 +324,9 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                     </div>
                 </div>
 
-                {/* Right Drawer: Participants or Chat */}
+                {/* Right Drawer: Participants or Chat — overlays on mobile, sidebar on desktop */}
                 {activeDrawer && (
-                    <aside className="w-full sm:w-80 h-full bg-neutral-900 border-l border-neutral-800 flex flex-col shrink-0 z-20 animate-in slide-in-from-right duration-200">
+                    <aside className="absolute sm:relative inset-0 sm:inset-auto w-full sm:w-80 h-full bg-neutral-900 border-l border-neutral-800 flex flex-col shrink-0 z-20 animate-in slide-in-from-right duration-200">
                         <div className="h-12 border-b border-neutral-800 px-4 flex items-center justify-between">
                             <h3 className="font-bold text-sm capitalize flex items-center gap-2">
                                 {activeDrawer === "participants" ? (
@@ -587,13 +587,14 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
             </div>
 
             {/* Bottom Controls Toolbar */}
-            <footer className="h-16 bg-neutral-900 border-t border-neutral-800 px-4 flex items-center justify-between shrink-0 z-30">
+            <footer className="h-auto min-h-[56px] sm:h-16 bg-neutral-900 border-t border-neutral-800 px-2 sm:px-4 py-2 sm:py-0 flex items-center justify-between shrink-0 z-30">
                 {/* Left side recorder controls */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                     {isRecording ? (
-                        <div className="flex items-center gap-2 bg-red-950/80 border border-red-800 text-red-300 px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
+                        <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-800 text-red-300 px-2 sm:px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
                             <Circle className="w-3 h-3 fill-red-500 text-red-500" />
-                            <span>REC {formatTime(recordingTime)}</span>
+                            <span className="hidden sm:inline">REC</span>
+                            <span>{formatTime(recordingTime)}</span>
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -606,44 +607,44 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                     ) : (
                         <Button
                             variant="secondary"
-                            size="sm"
+                            size="icon"
                             onClick={startRecording}
-                            className="h-9 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
+                            className="h-9 w-9 sm:w-auto sm:px-3 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
                             title="Start Call Recording"
                         >
                             <Circle className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                            <span className="hidden sm:inline">Record Call</span>
+                            <span className="hidden sm:inline">Record</span>
                         </Button>
                     )}
                 </div>
 
                 {/* Center Control Buttons */}
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-3">
                     <Button
                         variant={isMuted ? "destructive" : "secondary"}
                         size="icon"
                         onClick={onToggleMute}
-                        className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105"
+                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 cursor-pointer transition-transform hover:scale-105"
                         title={isMuted ? "Unmute Mic" : "Mute Mic"}
                     >
-                        {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                        {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
                     </Button>
 
                     <Button
                         variant={isCameraOff ? "destructive" : "secondary"}
                         size="icon"
                         onClick={onToggleCamera}
-                        className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105"
+                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 cursor-pointer transition-transform hover:scale-105"
                         title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
                     >
-                        {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                        {isCameraOff ? <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Video className="w-4 h-4 sm:w-5 sm:h-5" />}
                     </Button>
 
                     <Button
                         variant="secondary"
                         size="icon"
                         onClick={onSwitchCamera}
-                        className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105 hidden sm:inline-flex"
+                        className="rounded-full h-10 w-10 sm:h-11 sm:w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105"
                         title="Switch Front/Rear Camera"
                     >
                         <SwitchCamera className="w-5 h-5" />
@@ -675,24 +676,26 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
 
                     {/* End / Leave Call Button */}
                     {isHost ? (
-                        <div className="flex items-center gap-1.5 ml-2">
+                        <div className="flex items-center gap-1.5 ml-1">
                             <Button
                                 variant="destructive"
+                                size="icon"
                                 onClick={() => onSendHostControl("end-call")}
-                                className="h-11 px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer"
+                                className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer"
                             >
-                                <PhoneOff className="w-4 h-4 mr-1.5" />
-                                End for All
+                                <PhoneOff className="w-4 h-4" />
+                                <span className="hidden sm:inline ml-1.5">End for All</span>
                             </Button>
                         </div>
                     ) : (
                         <Button
                             variant="destructive"
+                            size="icon"
                             onClick={onLeaveCall}
-                            className="h-11 px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer ml-2"
+                            className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer ml-1"
                         >
-                            <PhoneOff className="w-4 h-4 mr-1.5" />
-                            Leave
+                            <PhoneOff className="w-4 h-4" />
+                            <span className="hidden sm:inline ml-1.5">Leave</span>
                         </Button>
                     )}
                 </div>

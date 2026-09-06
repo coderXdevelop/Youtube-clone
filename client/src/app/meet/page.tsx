@@ -62,34 +62,34 @@ export default function MeetLandingPage() {
     return (
         <div className="min-h-screen bg-gray-950 text-white flex flex-col font-sans select-none">
             <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 max-w-6xl mx-auto w-full">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center w-full my-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full my-auto">
                     {/* Left Hero Text */}
-                    <div className="lg:col-span-6 flex flex-col gap-6 text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-semibold w-fit">
+                    <div className="lg:col-span-6 flex flex-col gap-5 text-center lg:text-left">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-semibold w-fit mx-auto lg:mx-0">
                             <Sparkles className="w-4 h-4 text-red-500" />
                             <span>Real-Time HD Video Calls & Meetings</span>
                         </div>
 
-                        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-                            Connect, Collaborate & Share Streamlessly.
+                        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+                            Connect, Collaborate &amp; Share Streamlessly.
                         </h1>
 
-                        <p className="text-sm sm:text-base text-gray-400 leading-relaxed">
-                            Host secure 1-to-1 and group video meetings with high quality WebRTC audio & video, screen sharing, in-call chat, host moderation controls, and call recording.
+                        <p className="text-sm text-gray-400 leading-relaxed">
+                            Host secure 1-to-1 and group video meetings with WebRTC audio &amp; video, screen sharing, in-call chat, and call recording.
                         </p>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 text-xs">
-                            <div className="flex items-center gap-2 p-3 bg-neutral-900 border border-neutral-800 rounded-xl">
+                        <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
                                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                                <span className="font-semibold text-gray-300">Secure & Encrypted</span>
+                                <span className="font-semibold text-gray-300 text-center">Secure</span>
                             </div>
-                            <div className="flex items-center gap-2 p-3 bg-neutral-900 border border-neutral-800 rounded-xl">
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
                                 <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                                <span className="font-semibold text-gray-300">Host Moderation</span>
+                                <span className="font-semibold text-gray-300 text-center">Moderated</span>
                             </div>
-                            <div className="flex items-center gap-2 p-3 bg-neutral-900 border border-neutral-800 rounded-xl">
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
                                 <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
-                                <span className="font-semibold text-gray-300">No Time Limits</span>
+                                <span className="font-semibold text-gray-300 text-center">No Limits</span>
                             </div>
                         </div>
                     </div>

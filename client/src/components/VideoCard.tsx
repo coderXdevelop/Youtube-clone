@@ -31,7 +31,6 @@ export interface VideoCardProps {
 
 export default function VideoCard({ video }: VideoCardProps) {
   const thumbUrl = getMediaUrl(video?.thumbnailpath);
-  const videoSrc = `${getMediaUrl(video?.filepath)}#t=0.5`;
 
   const channelImg = video?.channelimage || video?.uploaderimage || video?.userimage || "";
   const channelImgUrl = channelImg ? getMediaUrl(channelImg) : "";
@@ -49,11 +48,11 @@ export default function VideoCard({ video }: VideoCardProps) {
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             />
           ) : (
-            <video
-              src={videoSrc}
-              preload="metadata"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-            />
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900">
+              <span className="text-4xl font-black text-neutral-600 select-none">
+                {video?.videochanel ? video.videochanel[0]?.toUpperCase() : "▶"}
+              </span>
+            </div>
           )}
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[11px] font-medium px-1.5 py-0.5 rounded">
             Video

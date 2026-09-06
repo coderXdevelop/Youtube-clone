@@ -66,8 +66,8 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
     }, [localStream, isCameraOff]);
 
     return (
-        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-4 sm:p-6 select-none">
-            <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-start lg:items-center justify-start lg:justify-center p-4 sm:p-6 select-none overflow-y-auto">
+            <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 items-center py-4 lg:py-0">
                 {/* Video Preview Box */}
                 <div className="lg:col-span-7 flex flex-col items-center gap-4">
                     <div className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 shadow-2xl flex items-center justify-center">
