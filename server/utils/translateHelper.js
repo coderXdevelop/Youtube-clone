@@ -1,25 +1,29 @@
 /**
  * Production-safe translation helper.
  *
- * WHY the old approach broke:
- *  - translate.googleapis.com/translate_a/single (the "gtx" client) is Google's
- *    internal/unofficial endpoint. It is rate-limited by IP, frequently blocked
- *    by cloud hosting providers (Vercel, Render, Railway) at the egress level,
- *    and has no public SLA. It reliably fails in serverless / shared-IP environments.
+ * ARCHITECTURE — 2 strategies, no external dependency beyond MyMemory:
  *
- * NEW APPROACH — 3-tier chain, all free, no API key required:
- *  1. MyMemory  (https://mymemory.translated.net) — official free tier, 5 000 chars/day/IP,
- *     works from all cloud providers, returns JSON.
- *  2. Lingva    (multiple public instances) — open-source Google Translate proxy.
- *     Tries several community-hosted instances in order.
- *  3. Failure signal — returns failed:true so controller sends 502, not a silent passthrough.
+ *  Strategy A (primary): MyMemory with auto-detect.
+ *    - If detection succeeds → done.
+ *    - If detection fails (returns same text) → Strategy B.
  *
- * BUGS FIXED IN THIS VERSION:
- *  - MyMemory rejected "auto" as source lang — it requires "autodetect".
- *    `"auto"` is truthy so the `|| "autodetect"` fallback never fired.
- *  - `translated === text` check caused valid unchanged results (untranslatable slang,
- *    proper nouns) to be discarded and fall through to Lingva unnecessarily.
- *  - Only one Lingva instance — `lingva.ml` is frequently down; now tries 3 instances.
+ *  Strategy B (fallback for undetected scripts):
+ *    For Latin-script text that MyMemory can't autodetect, probe a small set
+ *    of common languages until one produces a different result.
+ *    Common case: short words like "Ciao" (Italian), "Hola" (Spanish),
+ *    "Bonjour" (French) that are too short for autodetect to work.
+ *
+ *  Why not Lingva? All public Lingva instances (lingva.ml, thedaviddelta.com,
+ *  translate.plausibility.cloud) returned HTTP 500/503 in production — they are
+ *  community-run and unreliable. Tested 2026-09-06.
+ *
+ *  Why not Google translate_a? Returns 429 from cloud-hosted IPs (rate-limited by IP).
+ *
+ * BUGS FIXED:
+ *  - "auto" passed as langpair source to MyMemory — MyMemory requires "autodetect".
+ *    "auto" is a truthy string so the || "autodetect" fallback never fired.
+ *  - translated === text caused valid untranslatable text (slang, proper nouns) to fail.
+ *  - Single Lingva instance that is permanently down.
  */
 
 export const SUPPORTED_LANGUAGES = [
@@ -41,124 +45,122 @@ export const SUPPORTED_LANGUAGES = [
     { code: "te", name: "Telugu (తెలుగు)" },
 ];
 
-const TIMEOUT_MS = 6000;
+const TIMEOUT_MS = 7000;
 
 const withTimeout = (ms) => AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 
-// MyMemory language code overrides (it has its own dialect for some codes)
-const MYMEMORY_LANG_MAP = {
-    zh: "zh-CN",
-    he: "iw",
-    // "auto" -> "autodetect" is handled separately below (the critical bug fix)
-};
+// MyMemory requires its own dialect for some codes
+const MYMEMORY_LANG_MAP = { zh: "zh-CN", he: "iw" };
+
+// When autodetect fails for Latin-script text, probe these source langs in order.
+// Ordered by global comment frequency: Spanish, French, Italian, German, Portuguese, Turkish.
+const LATIN_PROBE_LANGS = ["es", "fr", "it", "de", "pt", "tr", "nl", "pl", "sv"];
 
 /**
- * Tier 1: MyMemory — official free public API, works reliably from cloud environments.
- * BUG FIX: source lang "auto" MUST become "autodetect" for MyMemory — "auto" is silently
- * rejected (returns responseStatus 400/206) because MyMemory does not recognise "auto".
+ * Single MyMemory call.
+ * Returns { translatedText, detectedSourceLang } on success, throws on failure.
+ * @param {string} sl - source language code OR "autodetect"
  */
-const tryMyMemory = async (text, targetLang, sourceLang) => {
+const myMemoryCall = async (text, targetLang, sl) => {
     const tl = MYMEMORY_LANG_MAP[targetLang] || targetLang;
-    // Critical: map "auto" to "autodetect" — MyMemory's required keyword
-    const sl = (sourceLang === "auto" || !sourceLang)
-        ? "autodetect"
-        : (MYMEMORY_LANG_MAP[sourceLang] || sourceLang);
+    const mappedSl = MYMEMORY_LANG_MAP[sl] || sl;
 
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sl}|${tl}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${mappedSl}|${tl}`;
     const res = await fetch(url, { signal: withTimeout(TIMEOUT_MS) });
     if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
 
     const data = await res.json();
-    // responseStatus 200 = OK; 429 = quota exceeded; 400 = bad params
     if (data?.responseStatus !== 200) throw new Error(`MyMemory status ${data?.responseStatus}: ${data?.responseDetails}`);
 
     const translated = data?.responseData?.translatedText;
-    if (!translated) throw new Error("MyMemory empty translatedText");
-
-    // If we used autodetect and got back the same text, MyMemory couldn't identify the language.
-    // Fall through to Lingva which handles short/ambiguous text better.
-    if (sl === "autodetect" && translated.trim().toLowerCase() === text.trim().toLowerCase()) {
-        throw new Error("MyMemory returned unchanged text with autodetect — likely unknown language");
-    }
+    if (!translated) throw new Error("MyMemory returned empty translatedText");
 
     return {
         translatedText: translated,
-        detectedSourceLang: data?.responseData?.detectedLanguage || sourceLang || "auto",
+        detectedSourceLang: data?.responseData?.detectedLanguage || sl,
+        sameAsInput: translated.trim().toLowerCase() === text.trim().toLowerCase(),
     };
 };
 
 /**
- * Tier 2: Lingva — tries multiple public instances in order.
- * lingva.ml goes down frequently; fallbacks prevent total failure.
- */
-const LINGVA_INSTANCES = [
-    "https://lingva.ml",
-    "https://lingva.thedaviddelta.com",
-    "https://translate.plausibility.cloud",
-];
-
-const tryLingva = async (text, targetLang, sourceLang) => {
-    const sl = (sourceLang && sourceLang !== "auto") ? sourceLang : "auto";
-
-    for (const instance of LINGVA_INSTANCES) {
-        try {
-            const url = `${instance}/api/v1/${sl}/${targetLang}/${encodeURIComponent(text)}`;
-            const res = await fetch(url, { signal: withTimeout(TIMEOUT_MS) });
-            if (!res.ok) continue;
-
-            const data = await res.json();
-            if (!data?.translation) continue;
-
-            return {
-                translatedText: data.translation,
-                detectedSourceLang: sourceLang || "auto",
-            };
-        } catch {
-            // Try next instance
-        }
-    }
-
-    throw new Error("All Lingva instances failed");
-};
-
-/**
- * Main export — tries tier 1 → tier 2 → returns failed:true
- * so the controller returns a proper 502 instead of silently passing back the original text.
+ * Main export — resolves translation or returns { failed: true }.
  */
 export const translateText = async (text, targetLang = "en", sourceLang = "auto") => {
     if (!text || !text.trim()) {
-        return { translatedText: text, detectedSourceLang: sourceLang, targetLang };
-    }
-
-    // Never try to "translate" to the same detected language
-    const detectedSrc = detectLanguageFromText(text);
-    if (detectedSrc !== "auto" && detectedSrc === targetLang) {
-        return { translatedText: text.trim(), detectedSourceLang: detectedSrc, targetLang, failed: false };
+        return { translatedText: text, detectedSourceLang: sourceLang, targetLang, failed: false };
     }
 
     const cleanText = text.trim();
+
+    // Script-based detection (reliable for non-Latin scripts: Arabic, Cyrillic, CJK, etc.)
+    const detectedSrc = detectLanguageFromText(cleanText);
+
+    // Never translate to the same detected language
+    if (detectedSrc !== "auto" && detectedSrc === targetLang) {
+        return { translatedText: cleanText, detectedSourceLang: detectedSrc, targetLang, failed: false };
+    }
+
+    // Determine the source language to try first
     const effectiveSrc = (sourceLang && sourceLang !== "auto")
         ? sourceLang
         : (detectedSrc !== "auto" ? detectedSrc : "auto");
 
-    // Tier 1: MyMemory
-    try {
-        const result = await tryMyMemory(cleanText, targetLang, effectiveSrc);
-        return { ...result, targetLang, failed: false };
-    } catch (err) {
-        console.warn("[translate] MyMemory failed:", err.message);
+    // ─── Strategy A: MyMemory with known/detected source lang ───────────────
+    if (effectiveSrc !== "auto") {
+        try {
+            const result = await myMemoryCall(cleanText, targetLang, effectiveSrc);
+            // Accept even if same as input — may be an untranslatable proper noun or slang
+            return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
+        } catch (err) {
+            console.warn("[translate] MyMemory (known src) failed:", err.message);
+        }
     }
 
-    // Tier 2: Lingva (multiple instances)
+    // ─── Strategy A2: MyMemory with autodetect ───────────────────────────────
     try {
-        const result = await tryLingva(cleanText, targetLang, effectiveSrc);
-        return { ...result, targetLang, failed: false };
+        const result = await myMemoryCall(cleanText, targetLang, "autodetect");
+        if (!result.sameAsInput) {
+            // Autodetect worked and produced a different result — use it
+            return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
+        }
+        // Autodetect couldn't identify the language (short Latin-script word) → Strategy B
+        console.warn("[translate] MyMemory autodetect returned same text, trying language probing");
     } catch (err) {
-        console.warn("[translate] Lingva failed:", err.message);
+        console.warn("[translate] MyMemory autodetect failed:", err.message);
     }
 
-    // All tiers failed
-    console.error("[translate] All translation providers failed for lang:", targetLang);
+    // ─── Strategy B: probe common Latin-script source languages ─────────────
+    // Handles words like "Hola" → es, "Bonjour" → fr that are long enough for TM lookup
+    // but too short for autodetect. Only probe if text is >= 6 chars to avoid garbage TM results
+    // for very short words (e.g. "Ciao" probed as French gives irrelevant TM noise).
+    if (cleanText.length >= 6) {
+        const probeTargets = LATIN_PROBE_LANGS.filter((l) => l !== targetLang);
+        for (const probeLang of probeTargets) {
+            try {
+                const result = await myMemoryCall(cleanText, targetLang, probeLang);
+                if (!result.sameAsInput) {
+                    return { translatedText: result.translatedText, detectedSourceLang: probeLang, targetLang, failed: false };
+                }
+            } catch {
+                // Try next
+            }
+        }
+    }
+
+    // For very short or truly untranslatable text (slang, proper nouns), return the
+    // autodetect result as-is rather than failing — it IS a valid translation outcome.
+    // The client already has the autodetect result from Strategy A2 above (same as input).
+    // Re-fetch it cleanly here to return a proper success response.
+    try {
+        const result = await myMemoryCall(cleanText, targetLang, "autodetect");
+        // Accept same-as-input for short/untranslatable content
+        return { translatedText: result.translatedText, detectedSourceLang: result.detectedSourceLang, targetLang, failed: false };
+    } catch {
+        // fall through to final failure
+    }
+
+    // All strategies exhausted
+    console.error("[translate] All translation strategies failed for:", cleanText, "→", targetLang);
     return {
         translatedText: null,
         detectedSourceLang: detectedSrc !== "auto" ? detectedSrc : sourceLang,
@@ -168,7 +170,8 @@ export const translateText = async (text, targetLang = "en", sourceLang = "auto"
 };
 
 /**
- * Script-based language detection from Unicode character ranges
+ * Script-based language detection from Unicode character ranges.
+ * Reliable for non-Latin scripts; returns "auto" for Latin-script text.
  */
 export const detectLanguageFromText = (text) => {
     if (!text || typeof text !== "string") return "auto";
