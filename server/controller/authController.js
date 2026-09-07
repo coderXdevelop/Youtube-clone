@@ -170,7 +170,6 @@ export const login = async (req, res) => {
                     challengeId: existingChallenge.challengeid,
                     emailMasked: maskEmail(email),
                     reason: existingChallenge.reason,
-                    testOtp: existingChallenge.otp,
                     deviceInfo: {
                         browser: uaMeta.browser,
                         os: uaMeta.os,
@@ -272,7 +271,6 @@ export const login = async (req, res) => {
                 challengeId,
                 emailMasked: maskEmail(email),
                 reason: reasonString,
-                testOtp: otpCode, // Provided for smooth sandbox and development verification
                 deviceInfo: {
                     browser: uaMeta.browser,
                     os: uaMeta.os,
@@ -533,7 +531,6 @@ export const resendLoginOtp = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "A fresh verification code has been generated and sent to your email.",
-            testOtp: newOtp,
         });
     } catch (error) {
         console.error("resendLoginOtp error:", error);

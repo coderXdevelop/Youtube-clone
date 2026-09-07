@@ -18,7 +18,6 @@ import {
     Smartphone,
     Globe,
     Laptop,
-    KeyRound,
     ArrowRight,
 } from "lucide-react";
 import axiosInstance from "@/lib/AxiosInstance";
@@ -27,7 +26,6 @@ export interface OtpChallengeData {
     challengeId: string;
     emailMasked: string;
     reason: string;
-    testOtp?: string;
     deviceInfo?: {
         browser?: string;
         os?: string;
@@ -55,14 +53,7 @@ export default function LoginSecurityOtpModal({
     const [loading, setLoading] = useState(false);
     const [resending, setResending] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [activeTestOtp, setActiveTestOtp] = useState<string | undefined>(challengeData?.testOtp);
     const [countdown, setCountdown] = useState(600); // 10 mins
-
-    useEffect(() => {
-        if (challengeData?.testOtp) {
-            setActiveTestOtp(challengeData.testOtp);
-        }
-    }, [challengeData]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -134,9 +125,6 @@ export default function LoginSecurityOtpModal({
             });
 
             if (res.data?.success) {
-                if (res.data.testOtp) {
-                    setActiveTestOtp(res.data.testOtp);
-                }
                 setCountdown(600);
             }
         } catch (err: unknown) {
@@ -147,12 +135,6 @@ export default function LoginSecurityOtpModal({
             setErrorMessage(errObj?.data?.message || "Failed to resend verification code.");
         } finally {
             setResending(false);
-        }
-    };
-
-    const handleUseTestOtp = () => {
-        if (activeTestOtp) {
-            setOtp(activeTestOtp);
         }
     };
 
@@ -221,30 +203,6 @@ export default function LoginSecurityOtpModal({
                         </span>
                     </div>
                 </div>
-
-                {/* Sandbox Test OTP Auto-Fill Banner */}
-                {activeTestOtp && (
-                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-200">
-                        <div className="flex items-center gap-1.5">
-                            <KeyRound className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                            <span>
-                                Sandbox OTP:{" "}
-                                <strong className="font-mono tracking-wider font-bold">
-                                    {activeTestOtp}
-                                </strong>
-                            </span>
-                        </div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            onClick={handleUseTestOtp}
-                            className="h-7 text-[11px] font-bold bg-amber-200/70 hover:bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:hover:bg-amber-900 dark:text-amber-100"
-                        >
-                            Auto-Fill
-                        </Button>
-                    </div>
-                )}
 
                 {/* OTP Input Form */}
                 <form onSubmit={handleVerify} className="space-y-4">

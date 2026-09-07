@@ -107,7 +107,6 @@ export const UserProvider = ({ children }) => {
                     challengeId: response.data.challengeId,
                     emailMasked: response.data.emailMasked,
                     reason: response.data.reason,
-                    testOtp: response.data.testOtp,
                     deviceInfo: response.data.deviceInfo,
                 });
                 setPendingFirebaseUser(firebaseuser);
