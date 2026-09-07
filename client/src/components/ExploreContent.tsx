@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
     Flame,
@@ -84,19 +84,151 @@ const DESTINATIONS: DestinationCard[] = [
 
 // Keywords helper for categories
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-    music: ["music", "song", "audio", "soundtrack", "concert", "beat", "album", "remix", "sing", "band"],
-    gaming: ["game", "gaming", "gameplay", "walkthrough", "stream", "play", "rpg", "fps", "esports", "minecraft", "gta"],
-    movies: ["movie", "film", "trailer", "cinema", "documentary", "teaser", "scene", "series", "episode"],
-    news: ["news", "breaking", "update", "report", "today", "politics", "world", "daily"],
-    sports: ["sport", "sports", "match", "game", "football", "soccer", "cricket", "basketball", "goal", "highlights"],
-    learning: ["education", "learn", "how to", "tutorial", "course", "guide", "code", "programming", "study", "tips"],
-    fashion: ["fashion", "style", "outfit", "makeup", "beauty", "clothing", "trend", "haul", "lookbook"],
+    music: [
+        "music",
+        "song",
+        "audio",
+        "soundtrack",
+        "concert",
+        "beat",
+        "album",
+        "remix",
+        "sing",
+        "band",
+        "pop",
+        "hip hop",
+        "rock",
+        "melody",
+        "rap",
+        "lofi",
+        "acoustic",
+    ],
+    gaming: [
+        "game",
+        "gaming",
+        "gameplay",
+        "walkthrough",
+        "stream",
+        "play",
+        "rpg",
+        "fps",
+        "esports",
+        "minecraft",
+        "gta",
+        "fortnite",
+        "valorant",
+        "pubg",
+        "roblox",
+        "pc",
+        "console",
+    ],
+    news: [
+        "news",
+        "breaking",
+        "update",
+        "report",
+        "today",
+        "politics",
+        "world",
+        "daily",
+        "press",
+        "bulletin",
+        "headline",
+        "current affairs",
+        "journalism",
+    ],
+    sports: [
+        "sport",
+        "sports",
+        "match",
+        "game",
+        "football",
+        "soccer",
+        "cricket",
+        "basketball",
+        "goal",
+        "highlights",
+        "athlete",
+        "fitness",
+        "workout",
+        "gym",
+        "ipl",
+        "fifa",
+        "tennis",
+        "wrestling",
+        "racing",
+    ],
+    learning: [
+        "education",
+        "learn",
+        "learning",
+        "how to",
+        "tutorial",
+        "course",
+        "guide",
+        "code",
+        "programming",
+        "study",
+        "tips",
+        "science",
+        "technology",
+        "tech",
+        "coding",
+        "lecture",
+        "class",
+        "development",
+        "ai",
+        "machine learning",
+        "python",
+        "javascript",
+        "react",
+        "software",
+    ],
+    movies: [
+        "movie",
+        "movies",
+        "film",
+        "trailer",
+        "cinema",
+        "documentary",
+        "teaser",
+        "scene",
+        "series",
+        "episode",
+        "entertainment",
+        "action",
+        "drama",
+        "show",
+        "hollywood",
+        "bollywood",
+        "short film",
+        "cinematic",
+        "comedy",
+    ],
+    fashion: [
+        "fashion",
+        "style",
+        "outfit",
+        "makeup",
+        "beauty",
+        "clothing",
+        "trend",
+        "haul",
+        "lookbook",
+        "lifestyle",
+        "skincare",
+        "grooming",
+        "model",
+        "vogue",
+        "cosmetics",
+    ],
 };
 
 export default function ExploreContent() {
     const [videos, setVideos] = useState<Video[]>([]);
     const [selectedDestination, setSelectedDestination] = useState<string>("Trending");
     const [loading, setLoading] = useState(true);
+    const videoSectionRef = useRef<HTMLDivElement>(null);
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || "";
 
     const fetchVideos = async () => {
@@ -117,6 +249,19 @@ export default function ExploreContent() {
         fetchVideos();
     }, []);
 
+    const handleSelectDestination = (destId: string) => {
+        setSelectedDestination(destId);
+        // Smoothly scroll down to video section
+        setTimeout(() => {
+            if (videoSectionRef.current) {
+                videoSectionRef.current.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+            }
+        }, 50);
+    };
+
     // Filter & sort videos based on selected destination
     const getFilteredVideos = () => {
         if (selectedDestination === "Trending") {
@@ -127,17 +272,62 @@ export default function ExploreContent() {
         const categoryKey = selectedDestination.toLowerCase();
         const keywords = CATEGORY_KEYWORDS[categoryKey] || [categoryKey];
 
-        const matched = videos.filter((v) => {
-            const cat = (v.category || "").toLowerCase();
+        return videos.filter((v) => {
+            const rawCat = (v.category || "").toLowerCase();
             const title = (v.videotitle || "").toLowerCase();
-            return (
-                cat.includes(categoryKey) ||
-                keywords.some((kw) => cat.includes(kw) || title.includes(kw))
+            const desc = (v.description || v.videodescription || (v as any).discription || "").toLowerCase();
+            const channel = (v.videochanel || "").toLowerCase();
+
+            const videoCategories = rawCat.split(",").map((c) => c.trim()).filter(Boolean);
+
+            // 1. Direct match on any assigned category tag
+            if (
+                videoCategories.some(
+                    (c) => c === categoryKey || categoryKey.includes(c) || c.includes(categoryKey)
+                )
+            ) {
+                return true;
+            }
+
+            // 2. Semantic aliases (e.g. learning <-> education / technology / science, movies <-> entertainment / cinema)
+            if (
+                categoryKey === "learning" &&
+                videoCategories.some((c) =>
+                    ["education", "technology", "science", "learning", "tech"].includes(c)
+                )
+            ) {
+                return true;
+            }
+            if (
+                categoryKey === "movies" &&
+                videoCategories.some((c) =>
+                    ["entertainment", "movies", "film", "cinema", "comedy"].includes(c)
+                )
+            ) {
+                return true;
+            }
+            if (
+                categoryKey === "news" &&
+                videoCategories.some((c) => ["news", "politics", "world"].includes(c))
+            ) {
+                return true;
+            }
+            if (
+                categoryKey === "sports" &&
+                videoCategories.some((c) => ["sports", "fitness", "games"].includes(c))
+            ) {
+                return true;
+            }
+
+            // 3. Keyword matching across category, title, description, and channel
+            return keywords.some(
+                (kw) =>
+                    rawCat.includes(kw) ||
+                    title.includes(kw) ||
+                    desc.includes(kw) ||
+                    channel.includes(kw)
             );
         });
-
-        // If no strict keyword matches, fallback to all videos sorted by recency
-        return matched.length > 0 ? matched : videos;
     };
 
     const displayVideos = getFilteredVideos();
@@ -169,8 +359,8 @@ export default function ExploreContent() {
                     return (
                         <button
                             key={dest.id}
-                            onClick={() => setSelectedDestination(dest.id)}
-                            className={`p-4 rounded-2xl border text-left transition-all duration-150 flex flex-col justify-between group relative cursor-pointer ${
+                            onClick={() => handleSelectDestination(dest.id)}
+                            className={`p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between group relative cursor-pointer active:scale-95 ${
                                 isSelected
                                     ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 border-zinc-900 dark:border-white shadow-md scale-[1.01]"
                                     : "bg-white dark:bg-zinc-900/90 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-zinc-200 dark:border-zinc-800"
@@ -187,7 +377,7 @@ export default function ExploreContent() {
                                     <Icon className={`w-4 h-4 ${dest.id === "Trending" ? "text-red-500" : ""}`} />
                                 </div>
                                 {isSelected && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                                 )}
                             </div>
                             <div className="space-y-0.5">
@@ -216,7 +406,10 @@ export default function ExploreContent() {
             </div>
 
             {/* 3. Section Title & Results Header */}
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+            <div
+                ref={videoSectionRef}
+                className="scroll-mt-24 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3"
+            >
                 <div className="flex items-center gap-2">
                     {selectedDestination === "Trending" ? (
                         <Flame className="w-5 h-5 text-red-500 fill-red-500" />
@@ -227,7 +420,7 @@ export default function ExploreContent() {
                         {selectedDestination === "Trending" ? "Trending Now" : `${selectedDestination} Videos`}
                     </h2>
                     <span className="text-xs text-gray-500 font-medium">
-                        ({displayVideos.length} videos)
+                        ({displayVideos.length} {displayVideos.length === 1 ? "video" : "videos"})
                     </span>
                 </div>
                 <Button
@@ -235,7 +428,7 @@ export default function ExploreContent() {
                     size="sm"
                     onClick={fetchVideos}
                     disabled={loading}
-                    className="h-8 px-2 text-xs text-gray-500"
+                    className="h-8 px-2 text-xs text-gray-500 cursor-pointer"
                 >
                     <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} />
                     Refresh
@@ -253,12 +446,12 @@ export default function ExploreContent() {
                     <Film className="w-12 h-12 mx-auto text-gray-400" />
                     <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">No Videos Found</h3>
                     <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                        No videos matching this category were found yet. Try exploring Trending or another category.
+                        No videos matching &quot;{selectedDestination}&quot; were found yet. Try exploring Trending or another category.
                     </p>
                     <Button
                         size="sm"
-                        onClick={() => setSelectedDestination("Trending")}
-                        className="text-xs bg-red-600 hover:bg-red-700 text-white"
+                        onClick={() => handleSelectDestination("Trending")}
+                        className="text-xs bg-red-600 hover:bg-red-700 text-white cursor-pointer"
                     >
                         View Trending
                     </Button>
@@ -318,7 +511,7 @@ export default function ExploreContent() {
                                         </span>
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 pt-1">
-                                        Explore this viral trending video on YouTube Clone. Watch in high quality with seamless playback.
+                                        {video.description || video.videodescription || "Explore this video on YouTube Clone. Watch in high quality with seamless playback."}
                                     </p>
                                     {video.category && (
                                         <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400">
