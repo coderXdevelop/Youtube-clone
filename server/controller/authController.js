@@ -147,6 +147,43 @@ export const login = async (req, res) => {
 
         // If unfamiliar/untrusted device detected: Trigger OTP Verification challenge
         if (isUnfamiliarLogin) {
+            const now = new Date();
+            // Check for an active, unexpired, unverified OTP challenge for this user
+            const existingChallenge = await LoginOtpChallenge.findOne({
+                userid: existingUser._id,
+                verified: false,
+                expiresat: { $gt: now },
+                attempts: { $lt: 5 },
+            }).sort({ createdAt: -1 });
+
+            // Dedup / reuse window: if an active challenge was created within 2 minutes (120s), reuse it
+            const CHALLENGE_REUSE_WINDOW_MS = 2 * 60 * 1000;
+            if (
+                existingChallenge &&
+                now.getTime() - new Date(existingChallenge.createdAt).getTime() < CHALLENGE_REUSE_WINDOW_MS
+            ) {
+                console.log(
+                    `[SECURITY] Reusing active OTP Challenge for ${email} (${existingChallenge.challengeid}) to avoid duplicate OTP generation.`
+                );
+                return res.status(200).json({
+                    requiresOtp: true,
+                    challengeId: existingChallenge.challengeid,
+                    emailMasked: maskEmail(email),
+                    reason: existingChallenge.reason,
+                    testOtp: existingChallenge.otp,
+                    deviceInfo: {
+                        browser: uaMeta.browser,
+                        os: uaMeta.os,
+                        deviceType: uaMeta.deviceType,
+                        ip: ipAddress,
+                        location: `${locationMeta.city}, ${locationMeta.state}, ${locationMeta.country}`,
+                    },
+                });
+            }
+
+            // Invalidate/clean any older unverified challenges for this user before creating a fresh one
+            await LoginOtpChallenge.deleteMany({ userid: existingUser._id, verified: false });
+
             const otpCode = generateOtp();
             const challengeId = `chal_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
@@ -457,7 +494,11 @@ export const resendLoginOtp = async (req, res) => {
     try {
         const challenge = await LoginOtpChallenge.findOne({ challengeid: challengeId });
         if (!challenge) {
-            return res.status(404).json({ message: "Challenge expired or not found." });
+            return res.status(404).json({ message: "Challenge expired or not found. Please try logging in again." });
+        }
+
+        if (challenge.verified) {
+            return res.status(400).json({ message: "Challenge already verified." });
         }
 
         const newOtp = generateOtp();
@@ -468,9 +509,30 @@ export const resendLoginOtp = async (req, res) => {
 
         console.log(`[SECURITY] Resent OTP for ${challenge.useremail}: ${newOtp}`);
 
+        // Dispatch transactional security OTP email via Brevo
+        try {
+            const userDoc = await User.findById(challenge.userid);
+            const meta = challenge.loginmeta || {};
+            await sendSecurityOtpEmail({
+                toEmail: challenge.useremail,
+                userName: userDoc?.name || challenge.useremail.split("@")[0],
+                otpCode: newOtp,
+                reason: challenge.reason || "OTP Resend Request",
+                deviceInfo: {
+                    browser: meta.browser,
+                    os: meta.os,
+                    deviceType: meta.devicetype,
+                    ip: meta.ipaddress,
+                    location: `${meta.city || ""}, ${meta.state || ""}, ${meta.country || ""}`.replace(/^, |, $/g, ""),
+                },
+            });
+        } catch (emailErr) {
+            console.warn(`[SECURITY] Background OTP email dispatch error on resend:`, emailErr.message);
+        }
+
         return res.status(200).json({
             success: true,
-            message: "A fresh verification code has been generated.",
+            message: "A fresh verification code has been generated and sent to your email.",
             testOtp: newOtp,
         });
     } catch (error) {

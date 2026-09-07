@@ -1,7 +1,7 @@
 "use client";
 
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
-import { useState, useEffect, useContext, createContext } from "react";
+import { useState, useEffect, useContext, createContext, useRef } from "react";
 import { provider, auth } from "./firebase";
 import axiosInstance from "./AxiosInstance";
 import { useEnvironment } from "./EnvironmentContext";
@@ -32,6 +32,9 @@ export const UserProvider = ({ children }) => {
     const [challengeData, setChallengeData] = useState(null);
     const [pendingFirebaseUser, setPendingFirebaseUser] = useState(null);
 
+    // Ref to prevent duplicate/concurrent in-flight authentication requests
+    const inFlightAuthRef = useRef(false);
+
     const login = (userdata, appliedTheme) => {
         setUser(userdata);
         if (typeof window !== "undefined") {
@@ -44,6 +47,9 @@ export const UserProvider = ({ children }) => {
 
     const logout = async () => {
         setUser(null);
+        setChallengeData(null);
+        setIsOtpModalOpen(false);
+        setPendingFirebaseUser(null);
         if (typeof window !== "undefined") {
             localStorage.removeItem("user");
         }
@@ -58,6 +64,25 @@ export const UserProvider = ({ children }) => {
      * Send login payload with rich device & location metadata to backend
      */
     const authenticateWithBackend = async (firebaseuser) => {
+        if (!firebaseuser?.email) return;
+
+        // Prevent duplicate concurrent requests
+        if (inFlightAuthRef.current) {
+            return;
+        }
+
+        // If OTP challenge modal is already open for this user, avoid re-triggering
+        if (isOtpModalOpen && challengeData) {
+            return;
+        }
+
+        // If user already logged in with matching email, skip
+        if (user && user.email === firebaseuser.email) {
+            return;
+        }
+
+        inFlightAuthRef.current = true;
+
         try {
             const deviceId = getOrCreateDeviceId();
             const payload = {
@@ -100,6 +125,8 @@ export const UserProvider = ({ children }) => {
             if (typeof window !== "undefined") {
                 localStorage.removeItem("user");
             }
+        } finally {
+            inFlightAuthRef.current = false;
         }
     };
 
@@ -107,7 +134,9 @@ export const UserProvider = ({ children }) => {
         try {
             const result = await signInWithPopup(auth, provider);
             const firebaseuser = result.user;
-            await authenticateWithBackend(firebaseuser);
+            if (firebaseuser) {
+                await authenticateWithBackend(firebaseuser);
+            }
         } catch (error) {
             if (
                 error.code === "auth/popup-closed-by-user" ||
@@ -135,6 +164,21 @@ export const UserProvider = ({ children }) => {
         setChallengeData(null);
         setPendingFirebaseUser(null);
         setIsOtpModalOpen(false);
+    };
+
+    const handleOtpClose = async () => {
+        setIsOtpModalOpen(false);
+        setChallengeData(null);
+        setPendingFirebaseUser(null);
+        setUser(null);
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("user");
+        }
+        try {
+            await signOut(auth);
+        } catch (err) {
+            console.error("Error signing out after OTP dismissal:", err);
+        }
     };
 
     useEffect(() => {
@@ -168,10 +212,7 @@ export const UserProvider = ({ children }) => {
             {/* 2FA Security OTP Verification Challenge Modal */}
             <LoginSecurityOtpModal
                 isOpen={isOtpModalOpen}
-                onClose={() => {
-                    setIsOtpModalOpen(false);
-                    setChallengeData(null);
-                }}
+                onClose={handleOtpClose}
                 challengeData={challengeData}
                 onSuccess={handleOtpSuccess}
             />
