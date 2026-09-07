@@ -69,8 +69,11 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
 
     const isHost = Boolean(
         user &&
-        meetingDetails?.hostId &&
-        String(user._id || user.id) === String(meetingDetails.hostId?._id || meetingDetails.hostId)
+        meetingDetails &&
+        (
+            (meetingDetails.hostId && String(user._id || user.id || user.uid) === String(meetingDetails.hostId?._id || meetingDetails.hostId)) ||
+            (user.email && meetingDetails.hostEmail && user.email.toLowerCase() === meetingDetails.hostEmail.toLowerCase())
+        )
     );
 
     const handleJoinWithPasscode = (passcodeInput: string) => {

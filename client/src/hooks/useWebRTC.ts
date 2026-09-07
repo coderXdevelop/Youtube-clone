@@ -402,6 +402,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         isReconnectingRef.current = false;
         setJoinError(null);
 
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+            socketRef.current = null;
+        }
+
         const socket = io(backendUrl, {
             transports: ["websocket", "polling"],
             reconnection: true,

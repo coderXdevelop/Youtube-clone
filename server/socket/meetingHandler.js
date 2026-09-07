@@ -15,7 +15,7 @@ export const setupMeetingSocket = (io) => {
                 }
 
                 // Check DB meeting record
-                let dbMeeting = await Meeting.findOne({ roomId });
+                let dbMeeting = await Meeting.findOne({ roomId }).populate("hostId", "name email image channelname");
                 if (!dbMeeting) {
                     dbMeeting = new Meeting({
                         roomId,
@@ -26,12 +26,43 @@ export const setupMeetingSocket = (io) => {
                     await dbMeeting.save();
                 }
 
-                const userIdStr = (user._id || user.id || socket.id).toString();
-                const dbHostId = dbMeeting.hostId?.toString();
-                const isHost =
-                    dbHostId === userIdStr ||
-                    (user._id && dbHostId === user._id.toString()) ||
-                    (user.id && dbHostId === user.id.toString());
+                const userIdStr = (user._id || user.id || user.uid || socket.id).toString();
+                const dbHostId = (dbMeeting.hostId?._id || dbMeeting.hostId)?.toString();
+                const dbHostEmail = dbMeeting.hostId?.email;
+
+                let isHost =
+                    (dbHostId && (
+                        dbHostId === userIdStr ||
+                        (user._id && dbHostId === user._id.toString()) ||
+                        (user.id && dbHostId === user.id.toString())
+                    )) ||
+                    (user.email && dbHostEmail && user.email.toLowerCase() === dbHostEmail.toLowerCase());
+
+                let roomState = rooms.get(roomId);
+                if (!roomState) {
+                    roomState = {
+                        roomId,
+                        hostUserId: dbHostId || userIdStr,
+                        hostEmail: dbHostEmail || user.email || "",
+                        isLocked: dbMeeting.isLocked || false,
+                        allowedScreenShare: dbMeeting.allowedScreenShare !== false,
+                        allowedChat: dbMeeting.allowedChat !== false,
+                        coHostUserIds: new Set((dbMeeting.coHosts || []).map((id) => (id._id || id).toString())),
+                        participants: new Map(),
+                        maxParticipants: dbMeeting.maxParticipants || 25,
+                    };
+                    rooms.set(roomId, roomState);
+                }
+
+                if (!isHost && roomState) {
+                    isHost =
+                        (roomState.hostUserId && (
+                            roomState.hostUserId === userIdStr ||
+                            (user._id && roomState.hostUserId === user._id.toString()) ||
+                            (user.id && roomState.hostUserId === user.id.toString())
+                        )) ||
+                        (user.email && roomState.hostEmail && user.email.toLowerCase() === roomState.hostEmail.toLowerCase());
+                }
 
                 // Passcode check: required for non-hosts
                 if (dbMeeting.passcode && !isHost) {
@@ -42,24 +73,6 @@ export const setupMeetingSocket = (io) => {
                         return;
                     }
                 }
-
-                let roomState = rooms.get(roomId);
-                if (!roomState) {
-                    roomState = {
-                        roomId,
-                        hostUserId: dbMeeting.hostId?.toString() || user._id || user.id,
-                        isLocked: dbMeeting.isLocked || false,
-                        allowedScreenShare: dbMeeting.allowedScreenShare !== false,
-                        allowedChat: dbMeeting.allowedChat !== false,
-                        coHostUserIds: new Set((dbMeeting.coHosts || []).map((id) => id.toString())),
-                        participants: new Map(),
-                        maxParticipants: dbMeeting.maxParticipants || 25,
-                    };
-                    rooms.set(roomId, roomState);
-                }
-
-                const userIdStr = (user._id || user.id || socket.id).toString();
-                const isHost = roomState.hostUserId === userIdStr;
 
                 if (roomState.isLocked && !isHost && !roomState.coHostUserIds.has(userIdStr)) {
                     socket.emit("join-error", { message: "Meeting is locked by the host" });

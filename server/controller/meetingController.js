@@ -53,7 +53,8 @@ export const getMeetingDetails = async (req, res) => {
             meeting: {
                 roomId: meeting.roomId,
                 title: meeting.title,
-                hostId: meeting.hostId?._id,
+                hostId: meeting.hostId?._id || meeting.hostId,
+                hostEmail: meeting.hostId?.email || "",
                 hostName: meeting.hostId?.name || "Host",
                 hostAvatar: meeting.hostId?.image || "",
                 hasPasscode: !!meeting.passcode,
