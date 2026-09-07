@@ -67,8 +67,14 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
         onCallEnded: handleCallEnded,
     });
 
+    const isHost = Boolean(
+        user &&
+        meetingDetails?.hostId &&
+        String(user._id || user.id) === String(meetingDetails.hostId?._id || meetingDetails.hostId)
+    );
+
     const handleJoinWithPasscode = (passcodeInput: string) => {
-        webrtc.joinRoom();
+        webrtc.joinRoom(passcodeInput);
     };
 
     const handleLeaveCall = () => {
@@ -108,6 +114,7 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
                 roomId={roomId}
                 meetingTitle={meetingDetails?.title || "Video Call Meeting"}
                 hasPasscode={meetingDetails?.hasPasscode || false}
+                isHost={isHost}
                 user={user}
                 localStream={webrtc.localStream}
                 isMuted={webrtc.isMuted}

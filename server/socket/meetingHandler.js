@@ -26,9 +26,21 @@ export const setupMeetingSocket = (io) => {
                     await dbMeeting.save();
                 }
 
-                if (dbMeeting.passcode && dbMeeting.passcode !== passcode) {
-                    socket.emit("join-error", { message: "Incorrect meeting passcode" });
-                    return;
+                const userIdStr = (user._id || user.id || socket.id).toString();
+                const dbHostId = dbMeeting.hostId?.toString();
+                const isHost =
+                    dbHostId === userIdStr ||
+                    (user._id && dbHostId === user._id.toString()) ||
+                    (user.id && dbHostId === user.id.toString());
+
+                // Passcode check: required for non-hosts
+                if (dbMeeting.passcode && !isHost) {
+                    const expectedPasscode = String(dbMeeting.passcode).trim();
+                    const providedPasscode = String(passcode || "").trim();
+                    if (expectedPasscode !== providedPasscode) {
+                        socket.emit("join-error", { message: "Incorrect meeting passcode. Please check and try again." });
+                        return;
+                    }
                 }
 
                 let roomState = rooms.get(roomId);

@@ -384,16 +384,23 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         }
     }, [roomId]);
 
-    // Internal join helper — emits join-room on an already-connected socket
-    const emitJoinRoom = useCallback((socket: Socket) => {
-        socket.emit("join-room", { roomId, user, passcode });
-    }, [roomId, user, passcode]);
+    const passcodeRef = useRef<string | undefined>(passcode);
+
+    useEffect(() => {
+        if (passcode !== undefined) {
+            passcodeRef.current = passcode;
+        }
+    }, [passcode]);
 
     // Join room function
-    const joinRoom = useCallback(async () => {
+    const joinRoom = useCallback(async (passcodeParam?: string) => {
         if (!user) return;
+        if (passcodeParam !== undefined) {
+            passcodeRef.current = passcodeParam;
+        }
         reconnectAttemptsRef.current = 0;
         isReconnectingRef.current = false;
+        setJoinError(null);
 
         const socket = io(backendUrl, {
             transports: ["websocket", "polling"],
@@ -410,7 +417,12 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             if (!localStreamRef.current) {
                 await initLocalStream();
             }
-            emitJoinRoom(socket);
+            const currentPass = (passcodeRef.current !== undefined ? passcodeRef.current : passcode)?.trim();
+            socket.emit("join-room", {
+                roomId,
+                user,
+                passcode: currentPass,
+            });
         });
 
         // Auto-reconnect: re-join room on socket reconnect (handles mobile network drops)
@@ -422,7 +434,12 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             peerConnectionsRef.current.forEach((pc) => pc.close());
             peerConnectionsRef.current.clear();
             setParticipants(new Map());
-            emitJoinRoom(socket);
+            const currentPass = (passcodeRef.current !== undefined ? passcodeRef.current : passcode)?.trim();
+            socket.emit("join-room", {
+                roomId,
+                user,
+                passcode: currentPass,
+            });
             isReconnectingRef.current = false;
         });
 

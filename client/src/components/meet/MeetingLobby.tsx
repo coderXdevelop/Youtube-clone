@@ -10,6 +10,7 @@ interface MeetingLobbyProps {
     roomId: string;
     meetingTitle?: string;
     hasPasscode?: boolean;
+    isHost?: boolean;
     user: any;
     localStream: MediaStream | null;
     isMuted: boolean;
@@ -31,6 +32,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
     roomId,
     meetingTitle = "Video Call",
     hasPasscode = false,
+    isHost = false,
     user,
     localStream,
     isMuted,
@@ -171,19 +173,29 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                     </div>
 
                     {hasPasscode && (
-                        <div className="flex flex-col gap-2">
-                            <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-                                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                                Meeting Passcode Required
-                            </label>
-                            <Input
-                                type="password"
-                                placeholder="Enter passcode"
-                                value={passcode}
-                                onChange={(e) => setPasscode(e.target.value)}
-                                className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm"
-                            />
-                        </div>
+                        isHost ? (
+                            <div className="flex items-center gap-2.5 p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs">
+                                <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                                <div>
+                                    <p className="font-semibold text-amber-200">Passcode Protected Meeting</p>
+                                    <p className="text-[11px] text-amber-400/80">You are verified as the Host. No passcode entry required.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                    Meeting Passcode Required
+                                </label>
+                                <Input
+                                    type="password"
+                                    placeholder="Enter passcode"
+                                    value={passcode}
+                                    onChange={(e) => setPasscode(e.target.value)}
+                                    className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm"
+                                />
+                            </div>
+                        )
                     )}
 
                     {joinError && (
