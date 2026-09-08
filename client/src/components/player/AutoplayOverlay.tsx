@@ -29,19 +29,17 @@ export default function AutoplayOverlay({
   useEffect(() => {
     if (!nextVideo) return;
 
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          onPlayNext();
-          return 0;
-        }
-        return prev - 1;
-      });
+    if (countdown === 0) {
+      onPlayNext();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => Math.max(0, prev - 1));
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [nextVideo, onPlayNext]);
+    return () => clearTimeout(timer);
+  }, [countdown, nextVideo, onPlayNext]);
 
   if (!nextVideo) return null;
 

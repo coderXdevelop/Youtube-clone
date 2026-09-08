@@ -10,4 +10,14 @@ const axiosInstance = axios.create({
     }
 });
 
+axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.code === "ERR_NETWORK" || !error.response) {
+            console.warn(`[Axios Network Warning] Backend API (${API_URL}) connection interrupted or restarting:`, error.message);
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default axiosInstance;

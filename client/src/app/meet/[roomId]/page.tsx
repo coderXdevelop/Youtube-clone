@@ -126,6 +126,10 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
                 availableAudioDevices={webrtc.availableAudioDevices}
                 selectedVideoDevice={webrtc.selectedVideoDevice}
                 selectedAudioDevice={webrtc.selectedAudioDevice}
+                mediaError={webrtc.mediaError}
+                isMobile={webrtc.isMobile}
+                facingMode={webrtc.facingMode}
+                onRetryMediaPermissions={webrtc.retryMediaPermissions}
                 onSelectVideoDevice={webrtc.setSelectedVideoDevice}
                 onSelectAudioDevice={webrtc.setSelectedAudioDevice}
                 onToggleMute={webrtc.toggleMute}
@@ -156,6 +160,10 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
             connectionQuality={webrtc.connectionQuality}
             speakingSockets={webrtc.speakingSockets}
             mySocketId={webrtc.mySocketId}
+            mediaError={webrtc.mediaError}
+            isMobile={webrtc.isMobile}
+            facingMode={webrtc.facingMode}
+            onRetryMediaPermissions={webrtc.retryMediaPermissions}
             onToggleMute={webrtc.toggleMute}
             onToggleCamera={webrtc.toggleCamera}
             onSwitchCamera={webrtc.switchCamera}

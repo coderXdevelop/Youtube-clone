@@ -30,13 +30,16 @@ export function getMediaUrl(filePath?: string): string {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-  const cleanPath = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const [pathPart, ...queryParts] = filePath.split("?");
+  const queryPart = queryParts.join("?");
+  const cleanPath = pathPart.replace(/\\/g, "/").replace(/^\/+/, "");
   const encodedPath = cleanPath
     .split("/")
     .map((segment) => encodeURIComponent(segment))
     .join("/");
 
-  return `${backendUrl.replace(/\/+$/, "")}/${encodedPath}`;
+  const queryString = queryPart ? `?${queryPart}` : "";
+  return `${backendUrl.replace(/\/+$/, "")}/${encodedPath}${queryString}`;
 }
 
 // Single Playback Coordination across tabs & multiple video instances

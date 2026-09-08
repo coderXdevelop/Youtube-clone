@@ -95,10 +95,21 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+    const [isMobile, setIsMobile] = useState<boolean>(false);
     const [availableVideoDevices, setAvailableVideoDevices] = useState<MediaDeviceInfo[]>([]);
     const [availableAudioDevices, setAvailableAudioDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
     const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>("");
+
+    // Detect mobile devices (phones/tablets with front/rear cameras)
+    useEffect(() => {
+        if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+            const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || "";
+            const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+            const isTouchScreen = Boolean(navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
+            setIsMobile(isMobileUA || isTouchScreen);
+        }
+    }, []);
 
     const [isHost, setIsHost] = useState(false);
     const [isCoHost, setIsCoHost] = useState(false);
@@ -114,11 +125,57 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const [isJoined, setIsJoined] = useState(false);
     const [mySocketId, setMySocketId] = useState<string>("");
 
+    const [mediaError, setMediaError] = useState<string | null>(null);
+    const [mediaPermissionState, setMediaPermissionState] = useState<{
+        camera: "granted" | "denied" | "prompt" | "unavailable";
+        audio: "granted" | "denied" | "prompt" | "unavailable";
+    }>({ camera: "prompt", audio: "prompt" });
+
     // Backend Socket URL
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
+    // Validate secure context and MediaDevices API availability
+    const checkMediaSupport = useCallback(() => {
+        if (typeof window === "undefined") return { supported: false, message: "Server-side environment." };
+        if (!window.isSecureContext && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+            return {
+                supported: false,
+                message: "Camera and Microphone access requires a secure context (HTTPS or localhost). Please switch to HTTPS.",
+            };
+        }
+        if (!navigator?.mediaDevices?.getUserMedia) {
+            return {
+                supported: false,
+                message: "Your browser does not support media device capture (getUserMedia is unavailable).",
+            };
+        }
+        return { supported: true, message: "" };
+    }, []);
+
+    // Format user-friendly media error message
+    const parseMediaError = useCallback((err: any): string => {
+        const errorName = err?.name || err?.message || "";
+        if (errorName.includes("NotAllowedError") || errorName.includes("PermissionDeniedError")) {
+            return "Camera or microphone permission was denied. Please click the lock or camera icon in your browser address bar to allow access.";
+        }
+        if (errorName.includes("NotFoundError") || errorName.includes("DevicesNotFoundError")) {
+            return "No camera or microphone hardware was found on this device.";
+        }
+        if (errorName.includes("NotReadableError") || errorName.includes("TrackStartError")) {
+            return "Camera or microphone is already in use by another application or browser tab.";
+        }
+        if (errorName.includes("OverconstrainedError")) {
+            return "The requested camera or microphone settings are not supported by your hardware.";
+        }
+        if (errorName.includes("SecurityError")) {
+            return "Media access blocked due to insecure HTTP context. Please use HTTPS.";
+        }
+        return err?.message || "Failed to access media devices.";
+    }, []);
+
     // Enumerate media input devices
     const enumerateDevices = useCallback(async () => {
+        if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return;
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoInputs = devices.filter((d) => d.kind === "videoinput");
@@ -138,22 +195,30 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             if (isStreamInitializingRef.current) return localStreamRef.current;
             isStreamInitializingRef.current = true;
 
+            const support = checkMediaSupport();
+            if (!support.supported) {
+                setMediaError(support.message);
+                setMediaPermissionState({ camera: "unavailable", audio: "unavailable" });
+                isStreamInitializingRef.current = false;
+                return null;
+            }
+
             try {
                 if (localStreamRef.current) {
                     localStreamRef.current.getTracks().forEach((t) => t.stop());
                 }
 
+                const targetFacing = customFacingMode || facingMode;
                 const constraints: MediaStreamConstraints = {
                     audio: {
                         echoCancellation: true,
                         noiseSuppression: true,
                         autoGainControl: true,
-                        deviceId: customAudioDeviceId ? { ideal: customAudioDeviceId } : undefined,
+                        deviceId: customAudioDeviceId ? { ideal: customAudioDeviceId } : (selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined),
                     },
-                    video: {
-                        facingMode: customFacingMode || facingMode,
-                        deviceId: customVideoDeviceId ? { ideal: customVideoDeviceId } : undefined,
-                    },
+                    video: customVideoDeviceId
+                        ? { deviceId: { ideal: customVideoDeviceId } }
+                        : { facingMode: { ideal: targetFacing } },
                 };
 
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -164,6 +229,8 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
                 localStreamRef.current = stream;
                 setLocalStream(stream);
+                setMediaError(null);
+                setMediaPermissionState({ camera: "granted", audio: "granted" });
 
                 // Update tracks in existing peer connections
                 peerConnectionsRef.current.forEach((pc) => {
@@ -172,6 +239,8 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                         const sender = senders.find((s) => s.track?.kind === track.kind);
                         if (sender) {
                             sender.replaceTrack(track);
+                        } else {
+                            pc.addTrack(track, stream);
                         }
                     });
                 });
@@ -191,6 +260,21 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
                     localStreamRef.current = basicStream;
                     setLocalStream(basicStream);
+                    setMediaError(null);
+                    setMediaPermissionState({ camera: "granted", audio: "granted" });
+
+                    peerConnectionsRef.current.forEach((pc) => {
+                        const senders = pc.getSenders();
+                        basicStream.getTracks().forEach((track) => {
+                            const sender = senders.find((s) => s.track?.kind === track.kind);
+                            if (sender) {
+                                sender.replaceTrack(track);
+                            } else {
+                                pc.addTrack(track, basicStream);
+                            }
+                        });
+                    });
+
                     await enumerateDevices();
                     return basicStream;
                 } catch (basicErr) {
@@ -207,9 +291,28 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                         setLocalStream(audioStream);
                         setIsCameraOff(true);
                         isCameraOffRef.current = true;
+                        setMediaError("Camera is unavailable. Running in audio-only mode.");
+                        setMediaPermissionState({ camera: "denied", audio: "granted" });
+
+                        peerConnectionsRef.current.forEach((pc) => {
+                            const senders = pc.getSenders();
+                            audioStream.getTracks().forEach((track) => {
+                                const sender = senders.find((s) => s.track?.kind === track.kind);
+                                if (sender) {
+                                    sender.replaceTrack(track);
+                                } else {
+                                    pc.addTrack(track, audioStream);
+                                }
+                            });
+                        });
+
+                        await enumerateDevices();
                         return audioStream;
-                    } catch (audioErr) {
+                    } catch (audioErr: any) {
                         console.error("Camera and Microphone permission denied:", audioErr);
+                        const userFriendlyMsg = parseMediaError(audioErr);
+                        setMediaError(userFriendlyMsg);
+                        setMediaPermissionState({ camera: "denied", audio: "denied" });
                         setIsCameraOff(true);
                         isCameraOffRef.current = true;
                         setIsMuted(true);
@@ -221,7 +324,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 isStreamInitializingRef.current = false;
             }
         },
-        [facingMode, enumerateDevices]
+        [facingMode, enumerateDevices, checkMediaSupport, parseMediaError]
     );
 
     // Initialize local stream once on hook mount
@@ -360,15 +463,54 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     }, []);
 
     // Toggle Audio Mute
-    const toggleMute = useCallback((forceVal?: boolean) => {
-        const targetMutedState = forceVal !== undefined ? forceVal : !isMutedRef.current;
+    const toggleMute = useCallback(async (forceVal?: boolean) => {
+        const targetMutedState = typeof forceVal === "boolean" ? forceVal : !isMutedRef.current;
         isMutedRef.current = targetMutedState;
         setIsMuted(targetMutedState);
 
-        if (localStreamRef.current) {
-            localStreamRef.current.getAudioTracks().forEach((track) => {
+        const currentStream = localStreamRef.current;
+        const audioTracks = currentStream ? currentStream.getAudioTracks() : [];
+
+        if (audioTracks.length > 0) {
+            audioTracks.forEach((track) => {
                 track.enabled = !targetMutedState;
             });
+        } else if (!targetMutedState && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+            // No audio track existed (e.g. initial failure), dynamically request microphone access
+            try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        deviceId: selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined,
+                    },
+                    video: false,
+                });
+                const newAudioTrack = audioStream.getAudioTracks()[0];
+                if (newAudioTrack) {
+                    newAudioTrack.enabled = true;
+                    if (localStreamRef.current) {
+                        localStreamRef.current.addTrack(newAudioTrack);
+                        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+                    } else {
+                        localStreamRef.current = audioStream;
+                        setLocalStream(audioStream);
+                    }
+
+                    peerConnectionsRef.current.forEach((pc) => {
+                        const senders = pc.getSenders();
+                        const audioSender = senders.find((s) => s.track?.kind === "audio");
+                        if (audioSender) {
+                            audioSender.replaceTrack(newAudioTrack);
+                        } else {
+                            pc.addTrack(newAudioTrack, localStreamRef.current!);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to dynamically acquire audio track on unmute:", err);
+            }
         }
 
         peerConnectionsRef.current.forEach((pc) => {
@@ -382,7 +524,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         if (socketRef.current && roomId) {
             socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
         }
-    }, [roomId]);
+    }, [roomId, selectedAudioDevice]);
 
     const passcodeRef = useRef<string | undefined>(passcode);
 
@@ -395,7 +537,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     // Join room function
     const joinRoom = useCallback(async (passcodeParam?: string) => {
         if (!user) return;
-        if (passcodeParam !== undefined) {
+        if (typeof passcodeParam === "string") {
             passcodeRef.current = passcodeParam;
         }
         reconnectAttemptsRef.current = 0;
@@ -571,15 +713,59 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, onKicked, onCallEnded, leaveRoom, toggleMute]);
 
     // Toggle Camera On/Off
-    const toggleCamera = useCallback((forceVal?: boolean) => {
-        const targetCameraOffState = forceVal !== undefined ? forceVal : !isCameraOffRef.current;
+    const toggleCamera = useCallback(async (forceVal?: boolean) => {
+        const targetCameraOffState = typeof forceVal === "boolean" ? forceVal : !isCameraOffRef.current;
         isCameraOffRef.current = targetCameraOffState;
         setIsCameraOff(targetCameraOffState);
 
-        if (localStreamRef.current) {
-            localStreamRef.current.getVideoTracks().forEach((track) => {
+        const currentStream = localStreamRef.current;
+        const videoTracks = currentStream ? currentStream.getVideoTracks() : [];
+
+        if (videoTracks.length > 0) {
+            videoTracks.forEach((track) => {
                 track.enabled = !targetCameraOffState;
             });
+        } else if (!targetCameraOffState && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+            // No video track existed (e.g. fallback to audio-only on initial join), dynamically request camera access
+            try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode,
+                        deviceId: selectedVideoDevice ? { ideal: selectedVideoDevice } : undefined,
+                    },
+                    audio: false,
+                });
+                const newVideoTrack = videoStream.getVideoTracks()[0];
+                if (newVideoTrack) {
+                    newVideoTrack.enabled = true;
+                    if (localStreamRef.current) {
+                        localStreamRef.current.addTrack(newVideoTrack);
+                        setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+                    } else {
+                        localStreamRef.current = videoStream;
+                        setLocalStream(videoStream);
+                    }
+
+                    peerConnectionsRef.current.forEach((pc) => {
+                        const senders = pc.getSenders();
+                        const videoSender = senders.find((s) => s.track?.kind === "video");
+                        if (videoSender) {
+                            videoSender.replaceTrack(newVideoTrack);
+                        } else {
+                            pc.addTrack(newVideoTrack, localStreamRef.current!);
+                        }
+                    });
+                    setMediaError(null);
+                    setMediaPermissionState((prev) => ({ ...prev, camera: "granted" }));
+                }
+            } catch (err: any) {
+                console.error("Failed to dynamically acquire video track on camera toggle:", err);
+                const userFriendlyMsg = parseMediaError(err);
+                setMediaError(userFriendlyMsg);
+                isCameraOffRef.current = true;
+                setIsCameraOff(true);
+                return;
+            }
         }
 
         peerConnectionsRef.current.forEach((pc) => {
@@ -593,14 +779,15 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         if (socketRef.current && roomId) {
             socketRef.current.emit("toggle-video", { roomId, isCameraOff: targetCameraOffState });
         }
-    }, [roomId]);
+    }, [roomId, facingMode, selectedVideoDevice, parseMediaError]);
 
     // Switch Camera (Front/Rear on Mobile)
     const switchCamera = useCallback(async () => {
         const nextMode = facingMode === "user" ? "environment" : "user";
         setFacingMode(nextMode);
-        await initLocalStream(undefined, undefined, nextMode);
-    }, [facingMode, initLocalStream]);
+        setSelectedVideoDevice("");
+        await initLocalStream(undefined, selectedAudioDevice, nextMode);
+    }, [facingMode, selectedAudioDevice, initLocalStream]);
 
     // Toggle Screen Share
     const toggleScreenShare = useCallback(async () => {
@@ -717,6 +904,12 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         [selectedVideoDevice, initLocalStream]
     );
 
+    // Retry acquiring media permissions on user action
+    const retryMediaPermissions = useCallback(async () => {
+        setMediaError(null);
+        return await initLocalStream(selectedVideoDevice, selectedAudioDevice, facingMode);
+    }, [initLocalStream, selectedVideoDevice, selectedAudioDevice, facingMode]);
+
     return {
         localStream,
         screenStream,
@@ -734,6 +927,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         joinError,
         isJoined,
         mySocketId,
+        mediaError,
+        mediaPermissionState,
+        isMobile,
+        facingMode,
         availableVideoDevices,
         availableAudioDevices,
         selectedVideoDevice,
@@ -741,6 +938,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         setSelectedVideoDevice: selectVideoDevice,
         setSelectedAudioDevice: selectAudioDevice,
         initLocalStream,
+        retryMediaPermissions,
         joinRoom,
         leaveRoom,
         toggleMute,

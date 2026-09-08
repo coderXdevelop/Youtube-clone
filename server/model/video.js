@@ -70,6 +70,41 @@ const videochema = mongoose.Schema(
             type: String,
             default: "",
         },
+        accesslevel: {
+            type: String,
+            enum: ["free", "bronze", "silver", "gold"],
+            default: "free",
+        },
+        ispremium: {
+            type: Boolean,
+            default: false,
+        },
+        previewduration: {
+            type: Number,
+            default: 60, // 60 seconds free preview for premium videos
+        },
+        qualityvariants: [
+            {
+                quality: { type: String, required: true }, // e.g., "360p", "480p", "720p", "1080p", "1440p", "4k"
+                filepath: { type: String, required: true },
+                filesize: { type: String, default: "" },
+                resolution: { type: String, default: "" },
+            },
+        ],
+        hlspath: {
+            type: String,
+            default: "",
+        },
+        hlsstatus: {
+            type: String,
+            enum: ["pending", "processing", "completed", "failed"],
+            default: "pending",
+        },
+        availablequalities: [
+            {
+                type: String,
+            },
+        ],
     },
     {
         timestamps: true,

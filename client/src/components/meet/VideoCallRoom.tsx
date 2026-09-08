@@ -23,6 +23,8 @@ import {
     VolumeX,
     SwitchCamera,
     ShieldAlert,
+    AlertTriangle,
+    RefreshCw,
     X,
 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -50,6 +52,10 @@ interface VideoCallRoomProps {
     connectionQuality: "Good" | "Fair" | "Poor";
     speakingSockets: Set<string>;
     mySocketId: string;
+    mediaError?: string | null;
+    isMobile?: boolean;
+    facingMode?: "user" | "environment";
+    onRetryMediaPermissions?: () => void;
     onToggleMute: () => void;
     onToggleCamera: () => void;
     onSwitchCamera: () => void;
@@ -78,6 +84,10 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     connectionQuality,
     speakingSockets,
     mySocketId,
+    mediaError,
+    isMobile = false,
+    facingMode = "user",
+    onRetryMediaPermissions,
     onToggleMute,
     onToggleCamera,
     onSwitchCamera,
@@ -113,6 +123,15 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         }, 1000);
         return () => clearInterval(interval);
     }, []);
+
+    const [dismissMediaError, setDismissMediaError] = useState(false);
+
+    // Reset dismiss status if mediaError changes
+    useEffect(() => {
+        if (mediaError) {
+            setDismissMediaError(false);
+        }
+    }, [mediaError]);
 
     // Format duration HH:MM:SS
     const formatTime = (secs: number) => {
@@ -251,6 +270,36 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                 </div>
             </header>
 
+            {/* In-Call Media Error / Fallback Notification Banner */}
+            {mediaError && !dismissMediaError && (
+                <div className="bg-amber-950/90 border-b border-amber-800 px-4 py-2 flex items-center justify-between gap-3 text-xs text-amber-200 z-20 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>{mediaError}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {onRetryMediaPermissions && (
+                            <button
+                                type="button"
+                                onClick={onRetryMediaPermissions}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-medium transition cursor-pointer"
+                            >
+                                <RefreshCw className="w-3 h-3" />
+                                <span>Retry Access</span>
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setDismissMediaError(true)}
+                            className="p-1 hover:bg-amber-800/40 rounded text-amber-400 hover:text-amber-200 transition cursor-pointer"
+                            title="Dismiss notification"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Main Center Video Layout */}
             <div className="flex-1 flex overflow-hidden relative">
                 <div className="flex-1 p-3 sm:p-4 overflow-y-auto flex items-center justify-center">
@@ -281,7 +330,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                 autoPlay
                                 playsInline
                                 muted
-                                className={`w-full h-full object-cover ${isScreenSharing ? "" : "-scale-x-100"} ${
+                                className={`w-full h-full object-cover ${isScreenSharing || facingMode === "environment" ? "" : "-scale-x-100"} ${
                                     isCameraOff ? "hidden" : "block"
                                 }`}
                             />
@@ -619,7 +668,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         <Button
                             variant={isMuted ? "destructive" : "secondary"}
                             size="icon"
-                            onClick={onToggleMute}
+                            onClick={() => onToggleMute()}
                             className="rounded-full h-10 w-10 cursor-pointer"
                             title={isMuted ? "Unmute" : "Mute"}
                         >
@@ -628,25 +677,27 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         <Button
                             variant={isCameraOff ? "destructive" : "secondary"}
                             size="icon"
-                            onClick={onToggleCamera}
+                            onClick={() => onToggleCamera()}
                             className="rounded-full h-10 w-10 cursor-pointer"
                             title={isCameraOff ? "Camera On" : "Camera Off"}
                         >
                             {isCameraOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                         </Button>
-                        <Button
-                            variant="secondary"
-                            size="icon"
-                            onClick={onSwitchCamera}
-                            className="rounded-full h-10 w-10 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer"
-                            title="Switch Camera"
-                        >
-                            <SwitchCamera className="w-4 h-4" />
-                        </Button>
+                        {isMobile && (
+                            <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => onSwitchCamera()}
+                                className="rounded-full h-10 w-10 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer"
+                                title="Switch Front/Rear Camera"
+                            >
+                                <SwitchCamera className="w-4 h-4" />
+                            </Button>
+                        )}
                         <Button
                             variant={isHandRaised ? "default" : "secondary"}
                             size="icon"
-                            onClick={onToggleRaiseHand}
+                            onClick={() => onToggleRaiseHand()}
                             className={`rounded-full h-10 w-10 cursor-pointer ${
                                 isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
                             }`}
@@ -741,7 +792,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={startRecording}
+                                onClick={() => startRecording()}
                                 className="h-9 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
                                 title="Start Call Recording"
                             >
@@ -753,20 +804,22 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
 
                     {/* Center: all controls */}
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <Button variant={isMuted ? "destructive" : "secondary"} size="icon" onClick={onToggleMute} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isMuted ? "Unmute Mic" : "Mute Mic"}>
+                        <Button variant={isMuted ? "destructive" : "secondary"} size="icon" onClick={() => onToggleMute()} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isMuted ? "Unmute Mic" : "Mute Mic"}>
                             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                         </Button>
-                        <Button variant={isCameraOff ? "destructive" : "secondary"} size="icon" onClick={onToggleCamera} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
+                        <Button variant={isCameraOff ? "destructive" : "secondary"} size="icon" onClick={() => onToggleCamera()} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
                             {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                         </Button>
-                        <Button variant="secondary" size="icon" onClick={onSwitchCamera} className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105" title="Switch Camera">
-                            <SwitchCamera className="w-5 h-5" />
-                        </Button>
+                        {isMobile && (
+                            <Button variant="secondary" size="icon" onClick={() => onSwitchCamera()} className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105" title="Switch Front/Rear Camera">
+                                <SwitchCamera className="w-5 h-5" />
+                            </Button>
+                        )}
                         {canScreenShare && (
                             <Button
                                 variant={isScreenSharing ? "default" : "secondary"}
                                 size="icon"
-                                onClick={onToggleScreenShare}
+                                onClick={() => onToggleScreenShare()}
                                 className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
                                     isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
                                 }`}
@@ -778,7 +831,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         <Button
                             variant={isHandRaised ? "default" : "secondary"}
                             size="icon"
-                            onClick={onToggleRaiseHand}
+                            onClick={() => onToggleRaiseHand()}
                             className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
                                 isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
                             }`}

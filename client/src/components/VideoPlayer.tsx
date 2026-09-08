@@ -1,9 +1,22 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Loader2, RotateCcw, Play, Pause } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Hls from "hls.js";
+import {
+  Loader2,
+  RotateCcw,
+  Play,
+  Pause,
+  Lock,
+  Sparkles,
+  AlertCircle,
+  ArrowRight,
+  ShieldAlert,
+  X,
+} from "lucide-react";
 import TimelineScrubber from "./player/TimelineScrubber";
-import PlayerControls from "./player/PlayerControls";
+import PlayerControls, { QualityOption } from "./player/PlayerControls";
 import AutoplayOverlay, { NextVideoInfo } from "./player/AutoplayOverlay";
 import DoubleClickRipple from "./player/DoubleClickRipple";
 import ShortcutsModal from "./player/ShortcutsModal";
@@ -41,8 +54,10 @@ export default function VideoPlayer({
   isTheater = false,
   onToggleTheater = () => {},
 }: VideoPlayerProps) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const { user } = useUser();
   const rawId = React.useId();
   const instanceId = `player_${rawId.replace(/:/g, "")}`;
@@ -55,13 +70,31 @@ export default function VideoPlayer({
   const [duration, setDuration] = useState(0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [quality, setQuality] = useState("Auto (1080p)");
+  const [quality, setQuality] = useState("Auto (Adaptive)");
+  const [qualities, setQualities] = useState<QualityOption[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
+
+  // Subscription & Restriction states
+  const [playbackInfo, setPlaybackInfo] = useState<any>(null);
+  const [previewExpired, setPreviewExpired] = useState(false);
+  const [dailyLimitExceeded, setDailyLimitExceeded] = useState(false);
+  const [qualityLockModal, setQualityLockModal] = useState<QualityOption | null>(null);
+  const [watchTimeStats, setWatchTimeStats] = useState<{
+    watchedSecondsToday: number;
+    remainingSecondsToday: number | null;
+    dailyLimitSeconds: number | null;
+    isUnlimited: boolean;
+  }>({
+    watchedSecondsToday: 0,
+    remainingSecondsToday: 3600,
+    dailyLimitSeconds: 3600,
+    isUnlimited: false,
+  });
 
   // UI interaction states
   const [showControls, setShowControls] = useState(true);
@@ -77,7 +110,135 @@ export default function VideoPlayer({
 
   const lastClickTimeRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
-  const videoSrc = getMediaUrl(video?.filepath);
+  // Fallback direct MP4 stream URL for scrubber thumbnail preview
+  const previewVideoSrc = getMediaUrl(
+    `api/video/stream/${video?._id}?quality=360p${
+      user?._id ? `&userId=${user._id}` : ""
+    }`
+  );
+
+  // Fetch Playback Authorization & Quality Info from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPlaybackAuth = async () => {
+      if (!video?._id) return;
+      try {
+        const res = await axiosInstance.get(`/api/video/playback-info/${video._id}?userId=${user?._id || ""}`);
+        if (!isMounted || !res.data) return;
+
+        setPlaybackInfo(res.data);
+        const autoOption: QualityOption = {
+          quality: "auto",
+          label: "Auto (Adaptive)",
+          isAllowed: true,
+          requiredPlan: "Free",
+        };
+
+        if (Array.isArray(res.data.qualities)) {
+          setQualities([autoOption, ...res.data.qualities]);
+        }
+        if (res.data.watchTime) {
+          setWatchTimeStats({
+            watchedSecondsToday: res.data.watchTime.watchedSecondsToday || 0,
+            remainingSecondsToday: res.data.watchTime.remainingSecondsToday,
+            dailyLimitSeconds: res.data.watchTime.dailyLimitSeconds,
+            isUnlimited: res.data.watchTime.isUnlimited || false,
+          });
+          if (res.data.watchTime.quotaExceeded) {
+            setDailyLimitExceeded(true);
+          }
+        }
+        if (res.data.access?.allowed === false && !res.data.access?.previewOnly) {
+          setPreviewExpired(true);
+        }
+      } catch (err) {
+        console.debug("Could not fetch playback authorization:", err);
+      }
+    };
+
+    fetchPlaybackAuth();
+    return () => {
+      isMounted = false;
+    };
+  }, [video?._id, user?._id]);
+
+  // Setup HLS Stream via hls.js or Native HLS
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !video?._id) return;
+
+    setPlaybackError(null);
+
+    const streamEndpoint =
+      playbackInfo?.hlsStreamUrl ||
+      playbackInfo?.streamUrl ||
+      `/api/video/hls/${video._id}/master.m3u8${user?._id ? `?userId=${user._id}` : ""}`;
+    const fullStreamUrl = getMediaUrl(streamEndpoint.replace(/^\/+/, ""));
+
+    if (Hls.isSupported()) {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+      }
+
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+      });
+
+      hlsRef.current = hls;
+
+      hls.loadSource(fullStreamUrl);
+      hls.attachMedia(v);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        console.log(`[HLS.js] Master playlist parsed with ${data.levels.length} quality levels.`);
+        if (quality.toLowerCase().includes("auto")) {
+          hls.currentLevel = -1; // Auto adaptive bitrate switching
+        }
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const currentLvl = hls.levels[data.level];
+        if (currentLvl) {
+          console.log(`[HLS.js] Seamlessly switched quality level: ${currentLvl.height}p (${currentLvl.bitrate} bps)`);
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.warn("[HLS.js] Fatal stream error:", data.type, data.details);
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              if (data.response?.code === 403) {
+                setPlaybackError("Access restricted. Your subscription plan does not permit this stream quality.");
+              } else {
+                hls.startLoad();
+              }
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              v.src = getMediaUrl(`api/video/stream/${video._id}?userId=${user?._id || ""}`);
+              break;
+          }
+        }
+      });
+
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari iOS native HLS
+      v.src = fullStreamUrl;
+    } else {
+      // Fallback direct stream
+      v.src = getMediaUrl(`api/video/stream/${video._id}?userId=${user?._id || ""}`);
+    }
+  }, [video?._id, playbackInfo?.hlsStreamUrl, playbackInfo?.streamUrl, user?._id]);
 
   // 1. Controls auto-hide timer
   const resetControlsTimer = useCallback(() => {
@@ -243,10 +404,10 @@ export default function VideoPlayer({
     }, 1500);
   }, []);
 
-  // Synchronize playbackRate whenever video element or src changes
+  // Synchronize playbackRate whenever video element or rate changes
   useEffect(() => {
     enforcePlaybackRate();
-  }, [playbackRate, videoSrc, enforcePlaybackRate]);
+  }, [playbackRate, enforcePlaybackRate]);
 
   // 8. Fullscreen Toggle
   const toggleFullscreen = useCallback(async () => {
@@ -329,7 +490,7 @@ export default function VideoPlayer({
     };
   }, [video._id, user]);
 
-  // 11. Periodic Watch Progress Heartbeat (every 5 seconds during playback)
+  // 11. Periodic Watch Progress & Watch-Time Heartbeat (every 5 seconds during playback)
   useEffect(() => {
     if (!isPlaying || duration <= 0) return;
 
@@ -343,6 +504,7 @@ export default function VideoPlayer({
       saveLocalProgress(video._id, pos, dur);
 
       if (user?._id) {
+        // Save playback progress position
         axiosInstance
           .post(`/api/history/progress/${video._id}`, {
             userId: user._id,
@@ -350,17 +512,53 @@ export default function VideoPlayer({
             duration: dur,
           })
           .catch(() => {});
+
+        // Send server-side watch-time quota heartbeat
+        axiosInstance
+          .post("/api/video/heartbeat", {
+            userId: user._id,
+            videoId: video._id,
+            secondsWatched: 5,
+            sessionId: instanceId,
+          })
+          .then((hbRes) => {
+            if (hbRes.data?.quotaExceeded) {
+              v.pause();
+              setIsPlaying(false);
+              setDailyLimitExceeded(true);
+            }
+            if (hbRes.data?.remainingSecondsToday !== undefined) {
+              setWatchTimeStats((prev) => ({
+                ...prev,
+                watchedSecondsToday: hbRes.data.watchedSecondsToday,
+                remainingSecondsToday: hbRes.data.remainingSecondsToday,
+                dailyLimitSeconds: hbRes.data.dailyLimitSeconds,
+                isUnlimited: hbRes.data.isUnlimited || false,
+              }));
+            }
+          })
+          .catch(() => {});
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, duration, video._id, user]);
+  }, [isPlaying, duration, video._id, user, instanceId]);
 
   // 12. Video Event Listeners (timeupdate, progress, ended, waiting, playing)
   const handleTimeUpdate = () => {
     const v = videoRef.current;
     if (!v) return;
     setCurrentTime(v.currentTime);
+
+    // Free Preview cutoff check for premium / course content
+    if (
+      playbackInfo?.access?.previewOnly &&
+      v.currentTime >= (playbackInfo?.access?.previewDuration || 60)
+    ) {
+      v.pause();
+      setIsPlaying(false);
+      setPreviewExpired(true);
+    }
 
     // Buffering calculation
     if (v.buffered.length > 0 && v.duration > 0) {
@@ -563,7 +761,6 @@ export default function VideoPlayer({
       {/* Video Element without native browser controls */}
       <video
         ref={videoRef}
-        src={videoSrc}
         className="w-full h-full object-contain cursor-pointer"
         controls={false}
         playsInline
@@ -590,7 +787,7 @@ export default function VideoPlayer({
         onEnded={handleVideoEnded}
         onError={() => {
           setIsBuffering(false);
-          setPlaybackError("Video could not be loaded. Please ensure the format is supported (e.g. H.264/MP4).");
+          setPlaybackError("Video could not be loaded. Please ensure the format is supported (e.g. HLS/MP4).");
         }}
       >
         Your browser does not support the video tag.
@@ -604,7 +801,9 @@ export default function VideoPlayer({
             onClick={(e) => {
               e.stopPropagation();
               setPlaybackError(null);
-              if (videoRef.current) {
+              if (hlsRef.current) {
+                hlsRef.current.startLoad();
+              } else if (videoRef.current) {
                 videoRef.current.load();
                 videoRef.current.play().catch(() => {});
               }
@@ -707,7 +906,7 @@ export default function VideoPlayer({
           duration={duration}
           buffered={bufferedPercent}
           onSeek={handleSeek}
-          videoSrc={videoSrc}
+          videoSrc={previewVideoSrc}
         />
 
         {/* Player Controls Bar */}
@@ -726,7 +925,35 @@ export default function VideoPlayer({
           playbackRate={playbackRate}
           onChangePlaybackRate={handleChangePlaybackRate}
           quality={quality}
-          onChangeQuality={setQuality}
+          onChangeQuality={(newQ) => {
+            setQuality(newQ);
+            // Seamless HLS quality switching without reload or video interrupt
+            if (hlsRef.current) {
+              if (newQ.toLowerCase().includes("auto")) {
+                hlsRef.current.currentLevel = -1; // Auto adaptive
+              } else {
+                const matchHeight = parseInt(newQ.replace(/[^0-9]/g, ""), 10);
+                const levelIdx = hlsRef.current.levels.findIndex(
+                  (lvl) =>
+                    lvl.height === matchHeight ||
+                    (lvl.attrs && lvl.attrs.NAME && lvl.attrs.NAME.toLowerCase().includes(newQ.toLowerCase().split(" ")[0]))
+                );
+                if (levelIdx !== -1) {
+                  hlsRef.current.currentLevel = levelIdx;
+                }
+              }
+            } else if (videoRef.current) {
+              const prevTime = videoRef.current.currentTime;
+              const wasPlaying = !videoRef.current.paused;
+              videoRef.current.load();
+              videoRef.current.currentTime = prevTime;
+              if (wasPlaying) {
+                videoRef.current.play().catch(() => {});
+              }
+            }
+          }}
+          qualities={qualities}
+          onSelectLockedQuality={(item) => setQualityLockModal(item)}
           isTheater={isTheater}
           onToggleTheater={onToggleTheater}
           isFullscreen={isFullscreen}
@@ -740,6 +967,114 @@ export default function VideoPlayer({
           onOpenShortcuts={() => setIsShortcutsOpen(true)}
         />
       </div>
+
+      {/* 1. Free Preview Expired / Premium Content Lock Overlay */}
+      {previewExpired && (
+        <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-black mb-4 shadow-lg shadow-amber-500/20">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {playbackInfo?.access?.previewOnly
+              ? "Free Preview Ended"
+              : "Premium Subscriber Content"}
+          </h3>
+          <p className="text-zinc-300 text-sm max-w-md mb-6 leading-relaxed">
+            {playbackInfo?.access?.message ||
+              `This exclusive video requires an active ${
+                playbackInfo?.access?.requiredPlan || "Bronze"
+              } or higher subscription plan to continue watching.`}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => router.push("/subscriptions")}
+              className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-semibold text-sm rounded-full shadow-lg transition flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+            >
+              <Sparkles className="w-4 h-4" />
+              Upgrade Subscription
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setPreviewExpired(false);
+                handleSeek(0);
+              }}
+              className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-full transition cursor-pointer"
+            >
+              Replay Preview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Daily Watch-Time Limit Reached Overlay */}
+      {dailyLimitExceeded && (
+        <div className="absolute inset-0 z-40 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center text-white mb-4 shadow-lg shadow-red-500/20">
+            <ShieldAlert className="w-7 h-7" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">
+            Daily Free Watch-Time Limit Reached
+          </h3>
+          <p className="text-zinc-300 text-sm max-w-md mb-6 leading-relaxed">
+            You have used all {Math.round((watchTimeStats.dailyLimitSeconds || 3600) / 60)} minutes
+            of free streaming for today. Upgrade to Bronze, Silver, or Gold to unlock unlimited watch time and ad-free playback.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => router.push("/subscriptions")}
+              className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-semibold text-sm rounded-full shadow-lg transition flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+            >
+              <Sparkles className="w-4 h-4" />
+              Unlock Unlimited Watch-Time
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Quality Plan Lock Modal */}
+      {qualityLockModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 fade-in duration-200 relative text-left">
+            <button
+              onClick={() => setQualityLockModal(null)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
+              <Lock className="w-5 h-5" />
+            </div>
+            <h4 className="text-lg font-bold text-white mb-1">
+              Unlock {qualityLockModal.label}
+            </h4>
+            <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+              Streaming in {qualityLockModal.label} is exclusive to{" "}
+              <span className="text-amber-400 font-semibold">{qualityLockModal.requiredPlan}</span>{" "}
+              subscribers and above. Free tier streaming is capped at 720p HD.
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setQualityLockModal(null);
+                  router.push("/subscriptions");
+                }}
+                className="flex-1 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-semibold text-xs rounded-lg shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Upgrade to {qualityLockModal.requiredPlan}
+              </button>
+              <button
+                onClick={() => setQualityLockModal(null)}
+                className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyboard Shortcuts Dialog */}
       <ShortcutsModal

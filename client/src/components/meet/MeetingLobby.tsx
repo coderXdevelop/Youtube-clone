@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, SwitchCamera, Lock, ShieldAlert, Play } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, SwitchCamera, Lock, ShieldAlert, Play, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -19,6 +19,10 @@ interface MeetingLobbyProps {
     availableAudioDevices: MediaDeviceInfo[];
     selectedVideoDevice: string;
     selectedAudioDevice: string;
+    mediaError?: string | null;
+    isMobile?: boolean;
+    facingMode?: "user" | "environment";
+    onRetryMediaPermissions?: () => void;
     onSelectVideoDevice: (deviceId: string) => void;
     onSelectAudioDevice: (deviceId: string) => void;
     onToggleMute: () => void;
@@ -41,6 +45,10 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
     availableAudioDevices,
     selectedVideoDevice,
     selectedAudioDevice,
+    mediaError,
+    isMobile = false,
+    facingMode = "user",
+    onRetryMediaPermissions,
     onSelectVideoDevice,
     onSelectAudioDevice,
     onToggleMute,
@@ -79,7 +87,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                             autoPlay
                             playsInline
                             muted
-                            className={`w-full h-full object-cover -scale-x-100 ${isCameraOff ? "hidden" : "block"}`}
+                            className={`w-full h-full object-cover ${facingMode === "environment" ? "scale-x-100" : "-scale-x-100"} ${isCameraOff ? "hidden" : "block"}`}
                         />
 
                         {/* Avatar overlay when camera is off */}
@@ -100,7 +108,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                             <Button
                                 variant={isMuted ? "destructive" : "secondary"}
                                 size="icon"
-                                onClick={onToggleMute}
+                                onClick={() => onToggleMute()}
                                 className="rounded-full h-10 w-10 cursor-pointer"
                                 title={isMuted ? "Unmute Mic" : "Mute Mic"}
                             >
@@ -109,23 +117,46 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                             <Button
                                 variant={isCameraOff ? "destructive" : "secondary"}
                                 size="icon"
-                                onClick={onToggleCamera}
+                                onClick={() => onToggleCamera()}
                                 className="rounded-full h-10 w-10 cursor-pointer"
                                 title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
                             >
                                 {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                             </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={onSwitchCamera}
-                                className="rounded-full h-10 w-10 border-neutral-700 bg-neutral-800 hover:bg-neutral-700 cursor-pointer"
-                                title="Switch Front/Rear Camera"
-                            >
-                                <SwitchCamera className="w-5 h-5 text-neutral-300" />
-                            </Button>
+                            {isMobile && (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => onSwitchCamera()}
+                                    className="rounded-full h-10 w-10 border-neutral-700 bg-neutral-800 hover:bg-neutral-700 cursor-pointer"
+                                    title="Switch Front/Rear Camera"
+                                >
+                                    <SwitchCamera className="w-5 h-5 text-neutral-300" />
+                                </Button>
+                            )}
                         </div>
                     </div>
+
+                    {/* Media Error / Permission Guidance Alert */}
+                    {mediaError && (
+                        <div className="w-full flex items-start gap-3 p-3.5 bg-amber-950/60 border border-amber-800/80 rounded-xl text-amber-200 text-xs shadow-lg">
+                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="flex-1 flex flex-col gap-1.5">
+                                <span className="font-semibold text-amber-300">Device Access Notice</span>
+                                <span className="text-[11px] leading-relaxed text-amber-200/90">{mediaError}</span>
+                                {onRetryMediaPermissions && (
+                                    <button
+                                        type="button"
+                                        onClick={onRetryMediaPermissions}
+                                        className="self-start mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                                    >
+                                        <RefreshCw className="w-3 h-3" />
+                                        <span>Retry Camera & Mic</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Hardware Selectors */}
                     <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">

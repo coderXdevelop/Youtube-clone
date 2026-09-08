@@ -20,6 +20,7 @@ import {
   Check,
   ToggleLeft,
   ToggleRight,
+  Lock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,6 +32,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatTime, formatRemainingTime } from "@/lib/playerUtils";
+
+export interface QualityOption {
+  quality: string;
+  label: string;
+  isAllowed: boolean;
+  requiredPlan: string;
+}
 
 interface PlayerControlsProps {
   isPlaying: boolean;
@@ -48,6 +56,8 @@ interface PlayerControlsProps {
   onChangePlaybackRate: (rate: number) => void;
   quality: string;
   onChangeQuality: (q: string) => void;
+  qualities?: QualityOption[];
+  onSelectLockedQuality?: (item: QualityOption) => void;
   isTheater: boolean;
   onToggleTheater: () => void;
   isFullscreen: boolean;
@@ -62,7 +72,15 @@ interface PlayerControlsProps {
 }
 
 const SPEED_OPTIONS = [0.5, 1, 1.25, 1.5, 2];
-const QUALITY_OPTIONS = ["Auto (1080p)", "720p", "480p", "360p"];
+const DEFAULT_QUALITY_OPTIONS: QualityOption[] = [
+  { quality: "auto", label: "Auto (Adaptive)", isAllowed: true, requiredPlan: "Free" },
+  { quality: "4k", label: "4K Ultra HD", isAllowed: false, requiredPlan: "Gold" },
+  { quality: "1440p", label: "1440p 2K QHD", isAllowed: false, requiredPlan: "Silver" },
+  { quality: "1080p", label: "1080p Full HD", isAllowed: false, requiredPlan: "Bronze" },
+  { quality: "720p", label: "720p HD", isAllowed: true, requiredPlan: "Free" },
+  { quality: "480p", label: "480p", isAllowed: true, requiredPlan: "Free" },
+  { quality: "360p", label: "360p", isAllowed: true, requiredPlan: "Free" },
+];
 
 export default function PlayerControls({
   isPlaying,
@@ -80,6 +98,8 @@ export default function PlayerControls({
   onChangePlaybackRate,
   quality,
   onChangeQuality,
+  qualities = DEFAULT_QUALITY_OPTIONS,
+  onSelectLockedQuality,
   isTheater,
   onToggleTheater,
   isFullscreen,
@@ -295,19 +315,42 @@ export default function PlayerControls({
 
             {/* Quality Section */}
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                Quality
+              <DropdownMenuLabel className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Quality</span>
               </DropdownMenuLabel>
-              {QUALITY_OPTIONS.map((q) => (
-                <DropdownMenuItem
-                  key={q}
-                  onClick={() => onChangeQuality(q)}
-                  className="flex items-center justify-between text-xs cursor-pointer hover:bg-zinc-800"
-                >
-                  <span>{q}</span>
-                  {quality === q && <Check className="w-3.5 h-3.5 text-red-500" />}
-                </DropdownMenuItem>
-              ))}
+              {qualities.map((item) => {
+                const isSelected = quality.toLowerCase().includes(item.quality.toLowerCase()) || quality === item.label;
+                const isLocked = !item.isAllowed;
+
+                return (
+                  <DropdownMenuItem
+                    key={item.quality}
+                    onClick={() => {
+                      if (isLocked) {
+                        if (onSelectLockedQuality) onSelectLockedQuality(item);
+                      } else {
+                        onChangeQuality(item.label);
+                      }
+                    }}
+                    className={`flex items-center justify-between text-xs cursor-pointer py-1.5 px-2.5 ${
+                      isLocked ? "opacity-75 hover:bg-zinc-800/60" : "hover:bg-zinc-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={isSelected ? "font-bold text-white" : "text-zinc-200"}>
+                        {item.label}
+                      </span>
+                      {isLocked && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" />
+                          {item.requiredPlan}
+                        </span>
+                      )}
+                    </div>
+                    {isSelected && !isLocked && <Check className="w-3.5 h-3.5 text-red-500" />}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuGroup>
 
             <DropdownMenuSeparator className="bg-zinc-800" />
