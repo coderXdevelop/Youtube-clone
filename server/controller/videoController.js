@@ -16,6 +16,7 @@ import {
     PLAN_CONFIG,
 } from "../utils/subscriptionAuth.js";
 import { transcodeVideoFile } from "../utils/transcodeService.js";
+import { generateCaptionsForVideo } from "../utils/captionService.js";
 import fs from "fs";
 import path from "path";
 import mongoose from "mongoose";
@@ -139,6 +140,11 @@ export const UploadVideo = async (req, res) => {
         // Asynchronously transcode multi-resolution variants (360p, 480p, 720p, 1080p) via FFmpeg in background
         transcodeVideoFile(normalizedFilePath, newVideo._id).catch((err) => {
             console.warn(`[FFMPEG] Background transcoding warning for ${newVideo._id}:`, err.message);
+        });
+
+        // Asynchronously extract audio and generate timestamped captions via Speech-to-Text
+        generateCaptionsForVideo(newVideo._id, normalizedFilePath, newVideo.uploader, "en").catch((err) => {
+            console.warn(`[Caption] Background STT caption generation warning for ${newVideo._id}:`, err.message);
         });
 
         return res.status(201).json({

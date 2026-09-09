@@ -66,6 +66,8 @@ interface PlayerControlsProps {
   onTogglePiP: () => void;
   subtitlesEnabled: boolean;
   onToggleSubtitles: () => void;
+  syncOffset?: number;
+  onChangeSyncOffset?: (offset: number) => void;
   autoplayEnabled: boolean;
   onToggleAutoplay: () => void;
   onOpenShortcuts: () => void;
@@ -108,6 +110,8 @@ export default function PlayerControls({
   onTogglePiP,
   subtitlesEnabled,
   onToggleSubtitles,
+  syncOffset = 0,
+  onChangeSyncOffset,
   autoplayEnabled,
   onToggleAutoplay,
   onOpenShortcuts,
@@ -352,6 +356,40 @@ export default function PlayerControls({
                 );
               })}
             </DropdownMenuGroup>
+
+            {/* Subtitle Sync Offset Section */}
+            {subtitlesEnabled && onChangeSyncOffset && (
+              <>
+                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Subtitle Sync</span>
+                    <span className="text-[10px] text-red-400 font-mono">
+                      {syncOffset === 0 ? "0.0s" : `${syncOffset > 0 ? "+" : ""}${syncOffset.toFixed(1)}s`}
+                    </span>
+                  </DropdownMenuLabel>
+                  <div className="grid grid-cols-5 gap-1 px-2 py-1.5">
+                    {[-0.5, -0.2, 0, 0.2, 0.5].map((val) => {
+                      const isActive = Math.abs(syncOffset - val) < 0.05;
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => onChangeSyncOffset(val)}
+                          className={`text-[10px] font-mono py-1 rounded transition text-center ${
+                            isActive
+                              ? "bg-red-600 text-white font-bold"
+                              : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                          }`}
+                        >
+                          {val === 0 ? "0s" : `${val > 0 ? "+" : ""}${val}s`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </DropdownMenuGroup>
+              </>
+            )}
 
             <DropdownMenuSeparator className="bg-zinc-800" />
 

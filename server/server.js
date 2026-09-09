@@ -86,6 +86,7 @@ app.use("/uploads", (req, res, next) => {
 
 app.use("/api/user", authRoute);
 app.use("/api/video", videoRoute);
+app.use("/video", videoRoute);
 app.use("/api/comment", commentRoute);
 app.use("/api/like", likeRoute);
 app.use("/api/history", historyRoute);

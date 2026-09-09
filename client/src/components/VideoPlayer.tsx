@@ -107,6 +107,28 @@ export default function VideoPlayer({
   const [speedNotice, setSpeedNotice] = useState<string | null>(null);
   const [volumeNotice, setVolumeNotice] = useState<string | null>(null);
   const volumeNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [subtitleNotice, setSubtitleNotice] = useState<string | null>(null);
+  const subtitleNoticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [captionSyncOffset, setCaptionSyncOffset] = useState<number>(0);
+
+  const handleChangeSyncOffset = useCallback((newOffset: number) => {
+    const clamped = Math.round(newOffset * 10) / 10;
+    setCaptionSyncOffset(clamped);
+    if (subtitleNoticeTimeoutRef.current) clearTimeout(subtitleNoticeTimeoutRef.current);
+    const label = clamped === 0 ? "Subtitle Sync: 0.0s (Normal)" : `Subtitle Sync: ${clamped > 0 ? "+" : ""}${clamped.toFixed(1)}s`;
+    setSubtitleNotice(label);
+    subtitleNoticeTimeoutRef.current = setTimeout(() => setSubtitleNotice(null), 1500);
+  }, []);
+
+  const handleToggleSubtitles = useCallback(() => {
+    setSubtitlesEnabled((prev) => {
+      const next = !prev;
+      if (subtitleNoticeTimeoutRef.current) clearTimeout(subtitleNoticeTimeoutRef.current);
+      setSubtitleNotice(next ? "Subtitles (CC) ON" : "Subtitles (CC) OFF");
+      subtitleNoticeTimeoutRef.current = setTimeout(() => setSubtitleNotice(null), 1500);
+      return next;
+    });
+  }, []);
 
   const lastClickTimeRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
@@ -692,7 +714,15 @@ export default function VideoPlayer({
           break;
         case "c":
           e.preventDefault();
-          setSubtitlesEnabled((prev) => !prev);
+          handleToggleSubtitles();
+          break;
+        case "[":
+          e.preventDefault();
+          handleChangeSyncOffset(captionSyncOffset - 0.2);
+          break;
+        case "]":
+          e.preventDefault();
+          handleChangeSyncOffset(captionSyncOffset + 0.2);
           break;
         case "n":
           if (nextVideo && onPlayNext) {
@@ -820,6 +850,8 @@ export default function VideoPlayer({
         enabled={subtitlesEnabled}
         videoRef={videoRef}
         videoTitle={video?.videotitle}
+        videoId={video?._id}
+        syncOffset={captionSyncOffset}
       />
 
       {/* Double-click seek ripple */}
@@ -851,6 +883,14 @@ export default function VideoPlayer({
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/85 border border-zinc-700/80 backdrop-blur-md text-white font-semibold text-sm px-4 py-1.5 rounded-full shadow-2xl z-20 pointer-events-none animate-in fade-in zoom-in-90 duration-150 flex items-center gap-2">
           <span className="text-zinc-400 text-xs uppercase tracking-wide">Volume</span>
           <span className="text-white font-bold">{volumeNotice}</span>
+        </div>
+      )}
+
+      {/* Subtitles / CC HUD Notice */}
+      {subtitleNotice && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/85 border border-zinc-700/80 backdrop-blur-md text-white font-semibold text-sm px-4 py-1.5 rounded-full shadow-2xl z-20 pointer-events-none animate-in fade-in zoom-in-90 duration-150 flex items-center gap-2">
+          <span className="text-red-500 font-bold tracking-wider">CC</span>
+          <span className="text-white font-semibold">{subtitleNotice}</span>
         </div>
       )}
 
@@ -961,7 +1001,9 @@ export default function VideoPlayer({
           isPiP={isPiP}
           onTogglePiP={togglePiP}
           subtitlesEnabled={subtitlesEnabled}
-          onToggleSubtitles={() => setSubtitlesEnabled((prev) => !prev)}
+          onToggleSubtitles={handleToggleSubtitles}
+          syncOffset={captionSyncOffset}
+          onChangeSyncOffset={handleChangeSyncOffset}
           autoplayEnabled={autoplayEnabled}
           onToggleAutoplay={() => setAutoplayEnabled((prev) => !prev)}
           onOpenShortcuts={() => setIsShortcutsOpen(true)}

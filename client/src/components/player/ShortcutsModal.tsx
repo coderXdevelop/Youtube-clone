@@ -27,6 +27,7 @@ const SHORTCUTS = [
   { key: "t", desc: "Toggle Theater mode" },
   { key: "i or p", desc: "Toggle Picture-in-Picture (PiP)" },
   { key: "c", desc: "Toggle Subtitles / Captions" },
+  { key: "[ / ]", desc: "Nudge subtitle sync earlier / later (0.2s)" },
   { key: "< (Shift + ,)", desc: "Decrease playback speed" },
   { key: "> (Shift + .)", desc: "Increase playback speed" },
   { key: "n or Shift + n", desc: "Play next video" },
