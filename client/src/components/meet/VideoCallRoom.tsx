@@ -897,18 +897,29 @@ const RemoteVideoTile: React.FC<{
     onSpotlightToggle: () => void;
 }> = ({ participant, isSpeaking, isSpotlight, onSpotlightToggle }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
         if (participant.stream) {
-            if (video.srcObject !== participant.stream) {
-                video.srcObject = participant.stream;
+            const video = videoRef.current;
+            if (video) {
+                if (video.srcObject !== participant.stream) {
+                    video.srcObject = participant.stream;
+                }
+                video.play().catch(() => {});
             }
-            // Explicitly call play() to handle mobile browsers that need it
-            video.play().catch(() => {});
+
+            const audio = audioRef.current;
+            if (audio) {
+                if (audio.srcObject !== participant.stream) {
+                    audio.srcObject = participant.stream;
+                }
+                audio.play().catch(() => {});
+            }
         }
     }, [participant.stream, participant.isCameraOff]);
+
+    const showAvatar = participant.isCameraOff || !participant.stream;
 
     return (
         <div
@@ -917,22 +928,34 @@ const RemoteVideoTile: React.FC<{
                 isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20" : "border-neutral-800"
             }`}
         >
-            {!participant.isCameraOff && participant.stream ? (
-                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-            ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            {/* Always keep video element mounted to maintain WebRTC stream and audio playback */}
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className={`w-full h-full object-cover ${showAvatar ? "hidden" : "block"}`}
+            />
+
+            {/* Dedicated hidden audio element as fallback safeguard */}
+            <audio ref={audioRef} autoPlay playsInline className="hidden" />
+
+            {/* Fallback avatar overlay shown when camera is off or stream is not ready */}
+            {showAvatar && (
+                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-neutral-900">
                     <Avatar className="h-16 w-16 border-2 border-neutral-700">
                         <AvatarImage src={participant.avatar} />
                         <AvatarFallback className="bg-neutral-800 text-xl font-bold text-neutral-300">
                             {participant.name?.[0] || "P"}
                         </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs font-semibold text-neutral-400">{participant.name}</span>
+                    <span className="text-xs font-semibold text-neutral-400">
+                        {participant.name} {participant.isCameraOff ? "(Camera Off)" : ""}
+                    </span>
                 </div>
             )}
 
             {/* Name Badge */}
-            <div className="absolute bottom-2 left-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 border border-neutral-800">
+            <div className="absolute bottom-2 left-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 border border-neutral-800 z-10">
                 <span>{participant.name}</span>
                 {participant.isMuted && <MicOff className="w-3.5 h-3.5 text-red-500" />}
                 {participant.isHandRaised && <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
