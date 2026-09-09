@@ -331,7 +331,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                 playsInline
                                 muted
                                 className={`w-full h-full object-cover ${isScreenSharing || facingMode === "environment" ? "" : "-scale-x-100"} ${
-                                    isCameraOff ? "hidden" : "block"
+                                    isCameraOff ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"
                                 }`}
                             />
 
@@ -908,7 +908,9 @@ const RemoteVideoTile: React.FC<{
                 if (video.srcObject !== participant.stream) {
                     video.srcObject = participant.stream;
                 }
-                video.play().catch(() => {});
+                video.play().catch((e) => {
+                    console.debug("Video element play caught:", e);
+                });
             }
 
             const audio = audioRef.current;
@@ -916,7 +918,9 @@ const RemoteVideoTile: React.FC<{
                 if (audio.srcObject !== participant.stream) {
                     audio.srcObject = participant.stream;
                 }
-                audio.play().catch(() => {});
+                audio.play().catch((e) => {
+                    console.debug("Audio element play caught:", e);
+                });
             }
         }
     }, [participant.stream, participant.isCameraOff]);
@@ -930,16 +934,21 @@ const RemoteVideoTile: React.FC<{
                 isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20" : "border-neutral-800"
             }`}
         >
-            {/* Always keep video element mounted to maintain WebRTC stream and audio playback */}
+            {/* Always keep video element mounted without display:none so audio & video pipeline remains active */}
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className={`w-full h-full object-cover ${showAvatar ? "hidden" : "block"}`}
+                className={`w-full h-full object-cover ${showAvatar ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"}`}
             />
 
-            {/* Dedicated hidden audio element as fallback safeguard */}
-            <audio ref={audioRef} autoPlay playsInline className="hidden" />
+            {/* Dedicated fallback audio element using absolute positioning to avoid browser display:none suspension */}
+            <audio
+                ref={audioRef}
+                autoPlay
+                playsInline
+                style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" }}
+            />
 
             {/* Fallback avatar overlay shown when camera is off or stream is not ready */}
             {showAvatar && (

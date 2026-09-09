@@ -91,7 +91,8 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const [isCameraOff, setIsCameraOff] = useState(false);
     const isMutedRef = useRef(false);
     const isCameraOffRef = useRef(false);
-    const isStreamInitializingRef = useRef(false);
+    const streamInitPromiseRef = useRef<Promise<MediaStream | null> | null>(null);
+    const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [isHandRaised, setIsHandRaised] = useState(false);
@@ -194,147 +195,156 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     // Initialize local media stream
     const initLocalStream = useCallback(
         async (customVideoDeviceId?: string, customAudioDeviceId?: string, customFacingMode?: "user" | "environment") => {
-            if (isStreamInitializingRef.current) return localStreamRef.current;
-            isStreamInitializingRef.current = true;
-
-            const support = checkMediaSupport();
-            if (!support.supported) {
-                setMediaError(support.message);
-                setMediaPermissionState({ camera: "unavailable", audio: "unavailable" });
-                isStreamInitializingRef.current = false;
-                return null;
+            if (streamInitPromiseRef.current) {
+                return await streamInitPromiseRef.current;
             }
 
-            try {
-                if (localStreamRef.current) {
-                    localStreamRef.current.getTracks().forEach((t) => t.stop());
+            const initPromise = (async () => {
+                const support = checkMediaSupport();
+                if (!support.supported) {
+                    setMediaError(support.message);
+                    setMediaPermissionState({ camera: "unavailable", audio: "unavailable" });
+                    return null;
                 }
 
-                const targetFacing = customFacingMode || facingMode;
-                const constraints: MediaStreamConstraints = {
-                    audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true,
-                        deviceId: customAudioDeviceId ? { ideal: customAudioDeviceId } : (selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined),
-                    },
-                    video: customVideoDeviceId
-                        ? { deviceId: { ideal: customVideoDeviceId } }
-                        : { facingMode: { ideal: targetFacing } },
-                };
-
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                // Apply current mute and camera off preferences to newly acquired tracks
-                stream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
-                stream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
-
-                localStreamRef.current = stream;
-                setLocalStream(stream);
-                setMediaError(null);
-                setMediaPermissionState({ camera: "granted", audio: "granted" });
-
-                // Update tracks in existing peer connections
-                peerConnectionsRef.current.forEach((pc) => {
-                    const senders = pc.getSenders();
-                    stream.getTracks().forEach((track) => {
-                        const sender = senders.find((s) => s.track?.kind === track.kind);
-                        if (sender) {
-                            sender.replaceTrack(track);
-                        } else {
-                            pc.addTrack(track, stream);
-                        }
-                    });
-                });
-
-                await enumerateDevices();
-                return stream;
-            } catch (err: any) {
-                console.warn("Constrained getUserMedia failed, attempting basic video+audio fallback:", err);
                 try {
-                    const basicStream = await navigator.mediaDevices.getUserMedia({
-                        video: true,
-                        audio: { echoCancellation: true, noiseSuppression: true },
-                    });
+                    if (localStreamRef.current) {
+                        localStreamRef.current.getTracks().forEach((t) => t.stop());
+                    }
 
-                    basicStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
-                    basicStream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
+                    const targetFacing = customFacingMode || facingMode;
+                    const constraints: MediaStreamConstraints = {
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            deviceId: customAudioDeviceId ? { ideal: customAudioDeviceId } : (selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined),
+                        },
+                        video: customVideoDeviceId
+                            ? { deviceId: { ideal: customVideoDeviceId } }
+                            : { facingMode: { ideal: targetFacing } },
+                    };
 
-                    localStreamRef.current = basicStream;
-                    setLocalStream(basicStream);
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    // Apply current mute and camera off preferences to newly acquired tracks
+                    stream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                    stream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
+
+                    localStreamRef.current = stream;
+                    setLocalStream(stream);
                     setMediaError(null);
                     setMediaPermissionState({ camera: "granted", audio: "granted" });
 
+                    // Update tracks in existing peer connections
                     peerConnectionsRef.current.forEach((pc) => {
                         const senders = pc.getSenders();
-                        basicStream.getTracks().forEach((track) => {
+                        stream.getTracks().forEach((track) => {
                             const sender = senders.find((s) => s.track?.kind === track.kind);
                             if (sender) {
                                 sender.replaceTrack(track);
                             } else {
-                                pc.addTrack(track, basicStream);
+                                pc.addTrack(track, stream);
                             }
                         });
                     });
 
                     await enumerateDevices();
-                    return basicStream;
-                } catch (basicErr) {
-                    console.warn("Video source unreadable, falling back to audio-only mode:", basicErr);
+                    return stream;
+                } catch (err: any) {
+                    console.warn("Constrained getUserMedia failed, attempting basic video+audio fallback:", err);
                     try {
-                        const audioStream = await navigator.mediaDevices.getUserMedia({
+                        const basicStream = await navigator.mediaDevices.getUserMedia({
+                            video: true,
                             audio: { echoCancellation: true, noiseSuppression: true },
-                            video: false,
                         });
 
-                        audioStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                        basicStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                        basicStream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
 
-                        localStreamRef.current = audioStream;
-                        setLocalStream(audioStream);
-                        setIsCameraOff(true);
-                        isCameraOffRef.current = true;
-                        setMediaError("Camera is unavailable. Running in audio-only mode.");
-                        setMediaPermissionState({ camera: "denied", audio: "granted" });
+                        localStreamRef.current = basicStream;
+                        setLocalStream(basicStream);
+                        setMediaError(null);
+                        setMediaPermissionState({ camera: "granted", audio: "granted" });
 
                         peerConnectionsRef.current.forEach((pc) => {
                             const senders = pc.getSenders();
-                            audioStream.getTracks().forEach((track) => {
+                            basicStream.getTracks().forEach((track) => {
                                 const sender = senders.find((s) => s.track?.kind === track.kind);
                                 if (sender) {
                                     sender.replaceTrack(track);
                                 } else {
-                                    pc.addTrack(track, audioStream);
+                                    pc.addTrack(track, basicStream);
                                 }
                             });
                         });
 
                         await enumerateDevices();
-                        return audioStream;
-                    } catch (audioErr: any) {
-                        console.error("Camera and Microphone permission denied:", audioErr);
-                        const userFriendlyMsg = parseMediaError(audioErr);
-                        setMediaError(userFriendlyMsg);
-                        setMediaPermissionState({ camera: "denied", audio: "denied" });
-                        setIsCameraOff(true);
-                        isCameraOffRef.current = true;
-                        setIsMuted(true);
-                        isMutedRef.current = true;
-                        return null;
+                        return basicStream;
+                    } catch (basicErr) {
+                        console.warn("Video source unreadable, falling back to audio-only mode:", basicErr);
+                        try {
+                            const audioStream = await navigator.mediaDevices.getUserMedia({
+                                audio: { echoCancellation: true, noiseSuppression: true },
+                                video: false,
+                            });
+
+                            audioStream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+
+                            localStreamRef.current = audioStream;
+                            setLocalStream(audioStream);
+                            setIsCameraOff(true);
+                            isCameraOffRef.current = true;
+                            setMediaError("Camera is unavailable. Running in audio-only mode.");
+                            setMediaPermissionState({ camera: "denied", audio: "granted" });
+
+                            peerConnectionsRef.current.forEach((pc) => {
+                                const senders = pc.getSenders();
+                                audioStream.getTracks().forEach((track) => {
+                                    const sender = senders.find((s) => s.track?.kind === track.kind);
+                                    if (sender) {
+                                        sender.replaceTrack(track);
+                                    } else {
+                                        pc.addTrack(track, audioStream);
+                                    }
+                                });
+                            });
+
+                            await enumerateDevices();
+                            return audioStream;
+                        } catch (audioErr: any) {
+                            console.error("Camera and Microphone permission denied:", audioErr);
+                            const userFriendlyMsg = parseMediaError(audioErr);
+                            setMediaError(userFriendlyMsg);
+                            setMediaPermissionState({ camera: "denied", audio: "denied" });
+                            setIsCameraOff(true);
+                            isCameraOffRef.current = true;
+                            setIsMuted(true);
+                            isMutedRef.current = true;
+                            return null;
+                        }
                     }
+                } finally {
+                    streamInitPromiseRef.current = null;
                 }
-            } finally {
-                isStreamInitializingRef.current = false;
-            }
+            })();
+
+            streamInitPromiseRef.current = initPromise;
+            return await initPromise;
         },
-        [facingMode, enumerateDevices, checkMediaSupport, parseMediaError]
+        [facingMode, enumerateDevices, checkMediaSupport, parseMediaError, selectedAudioDevice]
     );
 
     // Initialize local stream once on hook mount
     useEffect(() => {
         initLocalStream();
     }, []);
+
     useEffect(() => {
         if (!localStream) return;
+        const audioTracks = localStream.getAudioTracks();
+        if (audioTracks.length === 0) return;
+
         try {
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const audioSource = audioContext.createMediaStreamSource(localStream);
@@ -351,7 +361,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
                 setSpeakingSockets((prev) => {
                     const next = new Set(prev);
-                    if (average > 25 && !isMuted) {
+                    if (average > 25 && !isMutedRef.current) {
                         next.add(mySocketId);
                     } else {
                         next.delete(mySocketId);
@@ -362,12 +372,27 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
             return () => {
                 clearInterval(interval);
-                audioContext.close();
+                audioContext.close().catch(() => {});
             };
         } catch (e) {
             console.error("Audio Context setup error:", e);
         }
-    }, [localStream, isMuted, mySocketId]);
+    }, [localStream, mySocketId]);
+
+    // Process queued ICE candidates for a peer
+    const processPendingIceCandidates = useCallback(async (targetSocketId: string, pc: RTCPeerConnection) => {
+        const candidates = pendingIceCandidatesRef.current.get(targetSocketId);
+        if (candidates && candidates.length > 0) {
+            pendingIceCandidatesRef.current.delete(targetSocketId);
+            for (const candidate of candidates) {
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) {
+                    console.error("Error adding queued ICE candidate:", err);
+                }
+            }
+        }
+    }, []);
 
     // Create RTCPeerConnection for target peer socket
     const createPeerConnection = useCallback(
@@ -396,14 +421,27 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 }
             };
 
-            // Handle incoming remote track
+            // Handle incoming remote track (both audio and video)
             pc.ontrack = (event) => {
-                const remoteStream = event.streams[0];
+                const incomingTrack = event.track;
                 setParticipants((prev) => {
                     const next = new Map(prev);
                     const existing = next.get(targetSocketId);
                     if (existing) {
-                        next.set(targetSocketId, { ...existing, stream: remoteStream });
+                        let baseStream = existing.stream;
+                        if (event.streams && event.streams[0]) {
+                            baseStream = event.streams[0];
+                        } else if (!baseStream) {
+                            baseStream = new MediaStream();
+                        }
+
+                        if (!baseStream.getTracks().some((t) => t.id === incomingTrack.id)) {
+                            baseStream.addTrack(incomingTrack);
+                        }
+
+                        // Create a new MediaStream instance so React state updates trigger video/audio element binding
+                        const updatedStream = new MediaStream(baseStream.getTracks());
+                        next.set(targetSocketId, { ...existing, stream: updatedStream });
                     }
                     return next;
                 });
@@ -449,6 +487,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
         peerConnectionsRef.current.forEach((pc) => pc.close());
         peerConnectionsRef.current.clear();
+        pendingIceCandidatesRef.current.clear();
 
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -589,6 +628,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             // Re-establish peer connections after socket reconnect
             peerConnectionsRef.current.forEach((pc) => pc.close());
             peerConnectionsRef.current.clear();
+            pendingIceCandidatesRef.current.clear();
             setParticipants(new Map());
             const currentPass = (passcodeRef.current !== undefined ? passcodeRef.current : passcode)?.trim();
             socket.emit("join-room", {
@@ -606,11 +646,19 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             setRoomSettings(settings);
             setMySocketId(yourSocketId);
 
-            const map = new Map<string, Participant>();
-            existingParticipants.forEach((p: Participant) => {
-                map.set(p.socketId, p);
+            setParticipants((prev) => {
+                const map = new Map<string, Participant>();
+                existingParticipants.forEach((p: Participant) => {
+                    const existing = prev.get(p.socketId);
+                    map.set(p.socketId, { ...p, stream: existing?.stream });
+                });
+                return map;
             });
-            setParticipants(map);
+
+            // Ensure local stream is ready before creating offers
+            if (!localStreamRef.current) {
+                await initLocalStream();
+            }
 
             // Initiate WebRTC offers to existing participants
             existingParticipants.forEach(async (p: Participant) => {
@@ -628,7 +676,8 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         socket.on("user-joined", (p: Participant) => {
             setParticipants((prev) => {
                 const next = new Map(prev);
-                next.set(p.socketId, p);
+                const existing = next.get(p.socketId);
+                next.set(p.socketId, { ...p, stream: existing?.stream });
                 return next;
             });
         });
@@ -637,6 +686,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             const pc = createPeerConnection(senderSocketId, socket);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                await processPendingIceCandidates(senderSocketId, pc);
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 socket.emit("webrtc-answer", { targetSocketId: senderSocketId, answer });
@@ -650,6 +700,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             if (pc) {
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                    await processPendingIceCandidates(senderSocketId, pc);
                 } catch (err) {
                     console.error("Error setting remote description from answer:", err);
                 }
@@ -658,12 +709,17 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
         socket.on("ice-candidate", async ({ senderSocketId, candidate }) => {
             const pc = peerConnectionsRef.current.get(senderSocketId);
-            if (pc) {
+            if (pc && pc.remoteDescription && pc.remoteDescription.type) {
                 try {
                     await pc.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (err) {
                     console.error("Error adding ICE candidate:", err);
                 }
+            } else {
+                // Queue candidate until setRemoteDescription is complete
+                const queue = pendingIceCandidatesRef.current.get(senderSocketId) || [];
+                queue.push(candidate);
+                pendingIceCandidatesRef.current.set(senderSocketId, queue);
             }
         });
 
@@ -690,6 +746,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 pc.close();
                 peerConnectionsRef.current.delete(socketId);
             }
+            pendingIceCandidatesRef.current.delete(socketId);
         });
 
         socket.on("chat-message-received", (msg: ChatMessage) => {
@@ -723,7 +780,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         });
 
         return socket;
-    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, onKicked, onCallEnded, leaveRoom, toggleMute]);
+    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, processPendingIceCandidates, onKicked, onCallEnded, leaveRoom, toggleMute]);
 
     // Toggle Camera On/Off
     const toggleCamera = useCallback(async (forceVal?: boolean) => {
