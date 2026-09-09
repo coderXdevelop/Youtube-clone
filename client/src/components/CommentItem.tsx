@@ -92,6 +92,7 @@ const CommentItem = ({
     // Translation state
     const [isTranslated, setIsTranslated] = useState(false);
     const [translatedText, setTranslatedText] = useState<string | null>(null);
+    const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
     const [isTranslating, setIsTranslating] = useState(false);
     const [translationError, setTranslationError] = useState<string | null>(null);
 
@@ -261,6 +262,7 @@ const CommentItem = ({
             });
             if (res.data?.translatedText) {
                 setTranslatedText(res.data.translatedText);
+                setDetectedLanguage(res.data.detectedLanguageName || res.data.detectedSource || null);
                 setIsTranslated(true);
             } else {
                 setTranslationError("Translation unavailable. Click to retry.");
@@ -486,9 +488,9 @@ const CommentItem = ({
                                 </button>
 
                                 {isTranslated && (
-                                    <span className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                                        <Check className="w-3 h-3 text-green-500" />
-                                        Translated
+                                    <span className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1 bg-gray-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded-full font-medium border border-gray-200/50 dark:border-zinc-700/50">
+                                        <Check className="w-3 h-3 text-emerald-500" />
+                                        {detectedLanguage ? `Translated from ${detectedLanguage}` : "Translated"}
                                     </span>
                                 )}
 

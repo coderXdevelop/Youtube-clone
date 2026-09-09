@@ -14,7 +14,7 @@ import {
     createCaptchaChallenge,
     verifyCaptchaToken,
 } from "../utils/moderationHelper.js";
-import { translateText, detectLanguageFromText, SUPPORTED_LANGUAGES } from "../utils/translateHelper.js";
+import { translateText, detectLanguageFromText, SUPPORTED_LANGUAGES, getLanguageName } from "../utils/translateHelper.js";
 
 const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes edit window
 
@@ -620,7 +620,9 @@ export const translatecomment = async (req, res) => {
 
         return res.status(200).json({
             translatedText: translationResult.translatedText,
-            detectedSource: translationResult.detectedSourceLang,  // fixed: was translationResult.detectedSource (undefined)
+            detectedSource: translationResult.detectedSourceLang,
+            detectedLanguageName: getLanguageName(translationResult.detectedSourceLang),
+            provider: translationResult.provider,
             fromCache: false,
         });
     } catch (error) {
