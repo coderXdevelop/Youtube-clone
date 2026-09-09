@@ -37,6 +37,7 @@ export interface RoomSettings {
     isLocked: boolean;
     allowedScreenShare: boolean;
     allowedChat: boolean;
+    allowedAudio?: boolean;
 }
 
 interface UseWebRTCOptions {
@@ -117,6 +118,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         isLocked: false,
         allowedScreenShare: true,
         allowedChat: true,
+        allowedAudio: true,
     });
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [connectionQuality, setConnectionQuality] = useState<"Good" | "Fair" | "Poor">("Good");
@@ -465,6 +467,13 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     // Toggle Audio Mute
     const toggleMute = useCallback(async (forceVal?: boolean) => {
         const targetMutedState = typeof forceVal === "boolean" ? forceVal : !isMutedRef.current;
+
+        // Prevent participant from unmuting if the host has muted all and locked unmute
+        if (!targetMutedState && roomSettings.allowedAudio === false && !isHost && !isCoHost) {
+            alert("The host has muted all participants. Unmuting is currently locked by the host.");
+            return;
+        }
+
         isMutedRef.current = targetMutedState;
         setIsMuted(targetMutedState);
 
@@ -524,7 +533,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         if (socketRef.current && roomId) {
             socketRef.current.emit("toggle-audio", { roomId, isMuted: targetMutedState });
         }
-    }, [roomId, selectedAudioDevice]);
+    }, [roomId, selectedAudioDevice, roomSettings.allowedAudio, isHost, isCoHost]);
 
     const passcodeRef = useRef<string | undefined>(passcode);
 
@@ -705,6 +714,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             leaveRoom();
         });
 
+        socket.on("action-error", ({ message }: { message: string }) => {
+            alert(message || "Action not permitted");
+        });
+
         socket.on("join-error", ({ message }) => {
             setJoinError(message);
         });
@@ -819,6 +832,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 socketRef.current.emit("toggle-screenshare", { roomId, isScreenSharing: false });
             }
         } else {
+            if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+                alert("Screen sharing is not supported by your current browser or mobile device.");
+                return;
+            }
             try {
                 const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
                 screenStreamRef.current = stream;
@@ -853,8 +870,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 if (socketRef.current) {
                     socketRef.current.emit("toggle-screenshare", { roomId, isScreenSharing: true });
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Screen share error:", err);
+                if (err?.name !== "NotAllowedError" && err?.name !== "AbortError") {
+                    alert("Unable to start screen sharing on this device.");
+                }
             }
         }
     }, [isScreenSharing, roomSettings.allowedScreenShare, isHost, isCoHost, roomId]);

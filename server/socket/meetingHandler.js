@@ -47,6 +47,7 @@ export const setupMeetingSocket = (io) => {
                         isLocked: dbMeeting.isLocked || false,
                         allowedScreenShare: dbMeeting.allowedScreenShare !== false,
                         allowedChat: dbMeeting.allowedChat !== false,
+                        allowedAudio: dbMeeting.allowedAudio !== false,
                         coHostUserIds: new Set((dbMeeting.coHosts || []).map((id) => (id._id || id).toString())),
                         participants: new Map(),
                         maxParticipants: dbMeeting.maxParticipants || 25,
@@ -118,6 +119,7 @@ export const setupMeetingSocket = (io) => {
                         isLocked: roomState.isLocked,
                         allowedScreenShare: roomState.allowedScreenShare,
                         allowedChat: roomState.allowedChat,
+                        allowedAudio: roomState.allowedAudio !== false,
                     },
                     existingParticipants,
                 });
@@ -156,6 +158,12 @@ export const setupMeetingSocket = (io) => {
             const roomState = rooms.get(roomId);
             if (roomState && roomState.participants.has(socket.id)) {
                 const participant = roomState.participants.get(socket.id);
+                // If trying to unmute (!isMuted) but host disallowed unmuting
+                if (!isMuted && roomState.allowedAudio === false && !participant.isHost && !participant.isCoHost) {
+                    socket.emit("action-error", { message: "The host has muted all participants. Unmuting is currently locked." });
+                    socket.emit("force-mute");
+                    return;
+                }
                 participant.isMuted = isMuted;
                 io.to(roomId).emit("participant-updated", participant);
             }
@@ -234,12 +242,28 @@ export const setupMeetingSocket = (io) => {
                     io.to(roomId).emit("participant-updated", target);
                 }
             } else if (action === "mute-all") {
+                // Mute all non-host participants and lock unmute
+                roomState.allowedAudio = false;
                 roomState.participants.forEach((p, sId) => {
                     if (!p.isHost && !p.isCoHost) {
                         p.isMuted = true;
                         io.to(sId).emit("force-mute");
                         io.to(roomId).emit("participant-updated", p);
                     }
+                });
+                io.to(roomId).emit("room-settings-updated", {
+                    isLocked: roomState.isLocked,
+                    allowedScreenShare: roomState.allowedScreenShare,
+                    allowedChat: roomState.allowedChat,
+                    allowedAudio: roomState.allowedAudio,
+                });
+            } else if (action === "toggle-audio-permission" || action === "unmute-all" || action === "allow-unmute") {
+                roomState.allowedAudio = !roomState.allowedAudio;
+                io.to(roomId).emit("room-settings-updated", {
+                    isLocked: roomState.isLocked,
+                    allowedScreenShare: roomState.allowedScreenShare,
+                    allowedChat: roomState.allowedChat,
+                    allowedAudio: roomState.allowedAudio,
                 });
             } else if (action === "remove-participant" && targetSocketId) {
                 const target = roomState.participants.get(targetSocketId);
@@ -254,6 +278,7 @@ export const setupMeetingSocket = (io) => {
                     isLocked: roomState.isLocked,
                     allowedScreenShare: roomState.allowedScreenShare,
                     allowedChat: roomState.allowedChat,
+                    allowedAudio: roomState.allowedAudio,
                 });
             } else if (action === "toggle-screenshare-permission") {
                 roomState.allowedScreenShare = !roomState.allowedScreenShare;
@@ -261,6 +286,7 @@ export const setupMeetingSocket = (io) => {
                     isLocked: roomState.isLocked,
                     allowedScreenShare: roomState.allowedScreenShare,
                     allowedChat: roomState.allowedChat,
+                    allowedAudio: roomState.allowedAudio,
                 });
             } else if (action === "toggle-chat-permission") {
                 roomState.allowedChat = !roomState.allowedChat;
@@ -268,6 +294,7 @@ export const setupMeetingSocket = (io) => {
                     isLocked: roomState.isLocked,
                     allowedScreenShare: roomState.allowedScreenShare,
                     allowedChat: roomState.allowedChat,
+                    allowedAudio: roomState.allowedAudio,
                 });
             } else if (action === "assign-cohost" && targetSocketId) {
                 const target = roomState.participants.get(targetSocketId);
