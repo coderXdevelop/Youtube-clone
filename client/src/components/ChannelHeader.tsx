@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
+import { formatSubscriberCount } from "@/lib/utils";
+import axiosInstance from "@/lib/AxiosInstance";
 
 interface Channel {
     _id?: string;
@@ -9,6 +11,7 @@ interface Channel {
     name?: string;
     email?: string;
     image?: string;
+    subscribersCount?: number;
 }
 
 interface User {
@@ -26,13 +29,84 @@ interface ChannelHeaderProps {
 
 const ChannelHeader = ({ channel, user }: ChannelHeaderProps) => {
     const [isSubscribed, setIsSubscribed] = useState(false);
+    const [subscriberCount, setSubscriberCount] = useState<number>(0);
+    const [subscribing, setSubscribing] = useState(false);
 
-    const displayName = channel?.channelname || channel?.name || (channel?._id === user?._id ? user?.name : "") || "Channel";
-    const avatarSrc = channel?.image || (channel?._id === user?._id ? user?.image : "") || "";
+    const channelId = channel?._id;
+    const isOwner = Boolean(user && channelId && user._id === channelId);
+
+    const displayName = channel?.channelname || channel?.name || (isOwner ? user?.name : "") || "Channel";
+    const avatarSrc = channel?.image || (isOwner ? user?.image : "") || "";
     const handleName = (channel?.channelname || channel?.name || user?.name || "channel")
         .toLowerCase()
         .replace(/\s+/g, "");
     const initial = (displayName?.[0] || "C").toUpperCase();
+
+    // Fetch live channel subscription status & subscriber count
+    useEffect(() => {
+        let isMounted = true;
+        if (!channelId) return;
+
+        const fetchStatus = async () => {
+            try {
+                const query = user?._id ? `?userId=${user._id}` : "";
+                const res = await axiosInstance.get(`/api/channel-subscription/status/${channelId}${query}`);
+                if (isMounted && res.data?.success) {
+                    setIsSubscribed(Boolean(res.data.isSubscribed));
+                    if (typeof res.data.subscriberCount === "number") {
+                        setSubscriberCount(res.data.subscriberCount);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching channel header subscription status:", err);
+            }
+        };
+
+        fetchStatus();
+        return () => {
+            isMounted = false;
+        };
+    }, [channelId, user?._id]);
+
+    const handleToggleSubscribe = async () => {
+        if (!user?._id) {
+            alert("Please sign in to subscribe to channels.");
+            return;
+        }
+
+        if (!channelId || user._id === channelId) return;
+
+        const prevSubscribed = isSubscribed;
+        const prevCount = subscriberCount;
+
+        const nextSubscribed = !prevSubscribed;
+        const nextCount = nextSubscribed ? prevCount + 1 : Math.max(0, prevCount - 1);
+
+        // Optimistic UI update
+        setIsSubscribed(nextSubscribed);
+        setSubscriberCount(nextCount);
+        setSubscribing(true);
+
+        try {
+            const res = await axiosInstance.post(`/api/channel-subscription/toggle/${channelId}`, {
+                subscriberId: user._id,
+            });
+
+            if (res.data?.success) {
+                setIsSubscribed(Boolean(res.data.isSubscribed));
+                if (typeof res.data.subscriberCount === "number") {
+                    setSubscriberCount(res.data.subscriberCount);
+                }
+            }
+        } catch (error) {
+            console.error("Error subscribing from channel header:", error);
+            // Revert state on error
+            setIsSubscribed(prevSubscribed);
+            setSubscriberCount(prevCount);
+        } finally {
+            setSubscribing(false);
+        }
+    };
 
     return (
         <div className="w-full">
@@ -53,8 +127,12 @@ const ChannelHeader = ({ channel, user }: ChannelHeaderProps) => {
                         <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
                             {displayName}
                         </h1>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                             <span className="font-semibold text-gray-800 dark:text-gray-200">@{handleName}</span>
+                            <span>•</span>
+                            <span className="font-medium text-gray-600 dark:text-gray-400">
+                                {formatSubscriberCount(subscriberCount)}
+                            </span>
                         </div>
                         {channel?.description && (
                             <p className="text-sm text-gray-700 dark:text-gray-300 max-w-2xl whitespace-pre-wrap">
@@ -63,13 +141,16 @@ const ChannelHeader = ({ channel, user }: ChannelHeaderProps) => {
                         )}
                     </div>
 
-                    {user && user?._id !== channel?._id && (
+                    {!isOwner && channelId && (
                         <div className="flex gap-2 shrink-0">
                             <Button
-                                onClick={() => setIsSubscribed(!isSubscribed)}
+                                disabled={subscribing}
+                                onClick={handleToggleSubscribe}
                                 variant={isSubscribed ? "outline" : "default"}
                                 className={
-                                    isSubscribed ? "bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200" : "bg-red-600 hover:bg-red-700 text-white font-medium"
+                                    isSubscribed
+                                        ? "bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-zinc-700"
+                                        : "bg-red-600 hover:bg-red-700 text-white font-medium shadow-xs"
                                 }
                             >
                                 {isSubscribed ? "Subscribed" : "Subscribe"}

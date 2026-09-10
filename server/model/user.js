@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    subscribersCount: {
+        type: Number,
+        default: 0
+    },
     // Theme Preference: "auto" (IST time based), "light", or "dark"
     themepreference: {
         type: String,

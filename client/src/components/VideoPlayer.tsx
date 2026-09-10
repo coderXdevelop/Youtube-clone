@@ -132,12 +132,15 @@ export default function VideoPlayer({
 
   const lastClickTimeRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
-  // Fallback direct MP4 stream URL for scrubber thumbnail preview
-  const previewVideoSrc = getMediaUrl(
-    `api/video/stream/${video?._id}?quality=360p${
-      user?._id ? `&userId=${user._id}` : ""
-    }`
-  );
+  // Fallback direct MP4 stream URL and thumbnail for scrubber preview
+  const previewVideoSrc = video?.filepath
+    ? getMediaUrl(video.filepath)
+    : getMediaUrl(
+        `api/video/stream/${video?._id}?quality=360p${
+          user?._id ? `&userId=${user._id}` : ""
+        }`
+      );
+  const thumbnailSrc = video?.thumbnailpath ? getMediaUrl(video.thumbnailpath) : "";
 
   // Fetch Playback Authorization & Quality Info from backend
   useEffect(() => {
@@ -947,6 +950,7 @@ export default function VideoPlayer({
           buffered={bufferedPercent}
           onSeek={handleSeek}
           videoSrc={previewVideoSrc}
+          thumbnailSrc={thumbnailSrc}
         />
 
         {/* Player Controls Bar */}

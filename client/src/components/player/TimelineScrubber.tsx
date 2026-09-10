@@ -9,6 +9,7 @@ interface TimelineScrubberProps {
   buffered: number; // percentage 0-100
   onSeek: (targetTime: number) => void;
   videoSrc?: string;
+  thumbnailSrc?: string;
 }
 
 export default function TimelineScrubber({
@@ -17,16 +18,23 @@ export default function TimelineScrubber({
   buffered,
   onSeek,
   videoSrc,
+  thumbnailSrc,
 }: TimelineScrubberProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+
   const [isHovering, setIsHovering] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverPosition, setHoverPosition] = useState(0); // 0 to 1
   const [hoverTime, setHoverTime] = useState(0);
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
 
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const hoverPercent = hoverPosition * 100;
+
+  const targetTimeRef = useRef<number>(0);
+  const isSeekingRef = useRef<boolean>(false);
+  const rafIdRef = useRef<number | null>(null);
 
   const calculatePosition = useCallback(
     (clientX: number) => {
@@ -39,25 +47,40 @@ export default function TimelineScrubber({
     [duration]
   );
 
+  // Throttled frame seek to prevent browser decoder stalling
+  const requestFrameSeek = useCallback((time: number) => {
+    targetTimeRef.current = time;
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      const v = previewVideoRef.current;
+      if (!v || !isFinite(time) || isSeekingRef.current) return;
+
+      if (v.readyState >= 1) {
+        try {
+          isSeekingRef.current = true;
+          if ("fastSeek" in v && typeof (v as any).fastSeek === "function") {
+            (v as any).fastSeek(time);
+          } else {
+            v.currentTime = time;
+          }
+        } catch {
+          isSeekingRef.current = false;
+        }
+      }
+    });
+  }, []);
+
   const handleMouseMove = useCallback(
     (e: MouseEvent | React.MouseEvent) => {
       const pos = calculatePosition(e.clientX);
       setHoverPosition(pos);
       const time = pos * duration;
       setHoverTime(time);
-
-      if (previewVideoRef.current && isFinite(time)) {
-        previewVideoRef.current.currentTime = time;
-      }
+      requestFrameSeek(time);
     },
-    [calculatePosition, duration]
+    [calculatePosition, duration, requestFrameSeek]
   );
-
-  useEffect(() => {
-    if (previewVideoRef.current && isFinite(hoverTime)) {
-      previewVideoRef.current.currentTime = hoverTime;
-    }
-  }, [hoverTime]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -97,6 +120,33 @@ export default function TimelineScrubber({
       onMouseDown={handleMouseDown}
       className="relative w-full h-4 group flex items-center cursor-pointer touch-none select-none py-1"
     >
+      {/* Persistent Offscreen Video Element to keep media engine initialized */}
+      {videoSrc && (
+        <video
+          ref={previewVideoRef}
+          src={videoSrc}
+          preload="auto"
+          muted
+          playsInline
+          crossOrigin="anonymous"
+          onLoadedData={() => setIsVideoLoaded(true)}
+          onCanPlay={() => setIsVideoLoaded(true)}
+          onSeeked={() => {
+            isSeekingRef.current = false;
+            // Catch up if hover position moved during seek
+            const v = previewVideoRef.current;
+            if (v && Math.abs(v.currentTime - targetTimeRef.current) > 0.5) {
+              requestFrameSeek(targetTimeRef.current);
+            }
+          }}
+          onError={() => {
+            isSeekingRef.current = false;
+          }}
+          className="sr-only pointer-events-none"
+          aria-hidden="true"
+        />
+      )}
+
       {/* Hover Preview Tooltip & Frame Thumbnail */}
       {(isHovering || isDragging) && duration > 0 && (
         <div
@@ -106,28 +156,40 @@ export default function TimelineScrubber({
           }}
         >
           {/* Frame Preview Card */}
-          <div className="w-36 h-20 bg-black rounded-lg overflow-hidden border border-zinc-700 shadow-2xl mb-1.5 flex items-center justify-center relative">
-            {videoSrc ? (
-              <>
-                <video
-                  ref={previewVideoRef}
-                  src={videoSrc}
-                  preload="auto"
-                  muted
-                  playsInline
-                  onLoadedMetadata={(e) => {
-                    (e.target as HTMLVideoElement).currentTime = hoverTime;
-                  }}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-              </>
-            ) : (
-              <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-white">
+          <div className="w-36 h-20 bg-zinc-950 rounded-lg overflow-hidden border border-zinc-700 shadow-2xl mb-1.5 flex items-center justify-center relative">
+            {/* Thumbnail Backdrop Fallback */}
+            {thumbnailSrc && (
+              <img
+                src={thumbnailSrc}
+                alt="Video thumbnail preview"
+                className="absolute inset-0 w-full h-full object-cover opacity-70"
+              />
+            )}
+
+            {/* Live Video Frame Preview */}
+            {videoSrc && isVideoLoaded ? (
+              <video
+                src={videoSrc}
+                preload="auto"
+                muted
+                playsInline
+                crossOrigin="anonymous"
+                className="w-full h-full object-cover relative z-10"
+                ref={(el) => {
+                  if (el && previewVideoRef.current && isFinite(hoverTime)) {
+                    el.currentTime = hoverTime;
+                  }
+                }}
+              />
+            ) : !thumbnailSrc ? (
+              <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-xs text-white/80">
                 {formatTime(hoverTime)}
               </div>
-            )}
+            ) : null}
+
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/60 via-transparent to-transparent z-20" />
           </div>
+
           {/* Timestamp Pill */}
           <div className="bg-black/90 text-white text-[11px] font-semibold font-mono px-2.5 py-0.5 rounded-full border border-zinc-700 shadow">
             {formatTime(hoverTime)}
