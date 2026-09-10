@@ -908,9 +908,11 @@ const RemoteVideoTile: React.FC<{
                 if (video.srcObject !== participant.stream) {
                     video.srcObject = participant.stream;
                 }
-                video.play().catch((e) => {
-                    console.debug("Video element play caught:", e);
-                });
+                if (!participant.isCameraOff) {
+                    video.play().catch((e) => {
+                        console.debug("Remote video play caught:", e);
+                    });
+                }
             }
 
             const audio = audioRef.current;
@@ -918,8 +920,19 @@ const RemoteVideoTile: React.FC<{
                 if (audio.srcObject !== participant.stream) {
                     audio.srcObject = participant.stream;
                 }
+                audio.volume = 1.0;
                 audio.play().catch((e) => {
-                    console.debug("Audio element play caught:", e);
+                    console.debug("Remote audio autoplay caught, waiting for user gesture:", e);
+                    // Attach one-time window click/keydown listener to unlock audio if blocked by autoplay policy
+                    const unlockAudio = () => {
+                        audio.play().catch(() => {});
+                        window.removeEventListener("click", unlockAudio);
+                        window.removeEventListener("keydown", unlockAudio);
+                        window.removeEventListener("touchstart", unlockAudio);
+                    };
+                    window.addEventListener("click", unlockAudio, { once: true });
+                    window.addEventListener("keydown", unlockAudio, { once: true });
+                    window.addEventListener("touchstart", unlockAudio, { once: true });
                 });
             }
         }
@@ -931,18 +944,19 @@ const RemoteVideoTile: React.FC<{
         <div
             onClick={onSpotlightToggle}
             className={`relative aspect-video w-full max-h-[75vh] bg-neutral-900 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer group ${
-                isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20" : "border-neutral-800"
+                isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/40" : "border-neutral-800"
             }`}
         >
-            {/* Always keep video element mounted without display:none so audio & video pipeline remains active */}
+            {/* Muted video element for rendering video frames only (avoids duplicate audio echo) */}
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className={`w-full h-full object-cover ${showAvatar ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"}`}
             />
 
-            {/* Dedicated fallback audio element using absolute positioning to avoid browser display:none suspension */}
+            {/* Dedicated single audio sink for this participant's audio stream */}
             <audio
                 ref={audioRef}
                 autoPlay
@@ -965,9 +979,9 @@ const RemoteVideoTile: React.FC<{
                 </div>
             )}
 
-            {/* Name Badge */}
+            {/* Name Badge & Status Indicators */}
             <div className="absolute bottom-2 left-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 border border-neutral-800 z-10">
-                <span>{participant.name}</span>
+                <span className="max-w-[150px] truncate">{participant.name}</span>
                 {participant.isMuted && <MicOff className="w-3.5 h-3.5 text-red-500" />}
                 {participant.isHandRaised && <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
             </div>

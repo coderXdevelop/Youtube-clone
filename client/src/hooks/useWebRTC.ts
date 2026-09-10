@@ -358,13 +358,20 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 let sum = 0;
                 for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
                 const average = sum / dataArray.length;
+                const isSpeakingNow = average > 25 && !isMutedRef.current;
 
                 setSpeakingSockets((prev) => {
                     const next = new Set(prev);
-                    if (average > 25 && !isMutedRef.current) {
-                        next.add(mySocketId);
-                    } else {
-                        next.delete(mySocketId);
+                    const wasSpeaking = next.has(mySocketId);
+                    if (isSpeakingNow !== wasSpeaking) {
+                        if (isSpeakingNow) {
+                            next.add(mySocketId);
+                        } else {
+                            next.delete(mySocketId);
+                        }
+                        if (socketRef.current && roomId) {
+                            socketRef.current.emit("speaking-change", { roomId, isSpeaking: isSpeakingNow });
+                        }
                     }
                     return next;
                 });
@@ -377,7 +384,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         } catch (e) {
             console.error("Audio Context setup error:", e);
         }
-    }, [localStream, mySocketId]);
+    }, [localStream, mySocketId, roomId]);
 
     // Process queued ICE candidates for a peer
     const processPendingIceCandidates = useCallback(async (targetSocketId: string, pc: RTCPeerConnection) => {
@@ -411,6 +418,17 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 });
             }
 
+            // Ensure audio & video transceivers are configured for bidirectional media exchange
+            const senders = pc.getSenders();
+            const hasAudioSender = senders.some((s) => s.track?.kind === "audio");
+            const hasVideoSender = senders.some((s) => s.track?.kind === "video");
+            if (!hasAudioSender) {
+                try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (e) {}
+            }
+            if (!hasVideoSender) {
+                try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (e) {}
+            }
+
             // Handle ICE candidates
             pc.onicecandidate = (event) => {
                 if (event.candidate) {
@@ -427,21 +445,37 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 setParticipants((prev) => {
                     const next = new Map(prev);
                     const existing = next.get(targetSocketId);
+                    let baseStream: MediaStream;
+                    if (existing?.stream) {
+                        baseStream = existing.stream;
+                    } else if (event.streams && event.streams[0]) {
+                        baseStream = event.streams[0];
+                    } else {
+                        baseStream = new MediaStream();
+                    }
+
+                    if (!baseStream.getTracks().some((t) => t.id === incomingTrack.id)) {
+                        baseStream.addTrack(incomingTrack);
+                    }
+
+                    // Create a fresh MediaStream instance so React triggers media element updates
+                    const updatedStream = new MediaStream(baseStream.getTracks());
                     if (existing) {
-                        let baseStream = existing.stream;
-                        if (event.streams && event.streams[0]) {
-                            baseStream = event.streams[0];
-                        } else if (!baseStream) {
-                            baseStream = new MediaStream();
-                        }
-
-                        if (!baseStream.getTracks().some((t) => t.id === incomingTrack.id)) {
-                            baseStream.addTrack(incomingTrack);
-                        }
-
-                        // Create a new MediaStream instance so React state updates trigger video/audio element binding
-                        const updatedStream = new MediaStream(baseStream.getTracks());
                         next.set(targetSocketId, { ...existing, stream: updatedStream });
+                    } else {
+                        next.set(targetSocketId, {
+                            socketId: targetSocketId,
+                            userId: targetSocketId,
+                            name: "Participant",
+                            avatar: "",
+                            isMuted: false,
+                            isCameraOff: false,
+                            isScreenSharing: false,
+                            isHandRaised: false,
+                            isHost: false,
+                            isCoHost: false,
+                            stream: updatedStream,
+                        });
                     }
                     return next;
                 });
@@ -451,7 +485,6 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === "failed") {
                     setConnectionQuality("Poor");
-                    // Trigger ICE restart to recover the connection
                     try {
                         pc.restartIce();
                         pc.createOffer({ iceRestart: true }).then((offer) => {
@@ -609,6 +642,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         socket.on("connect", async () => {
             setMySocketId(socket.id!);
             reconnectAttemptsRef.current = 0;
+            // Clean up any existing peer connections on fresh socket connection
+            peerConnectionsRef.current.forEach((pc) => pc.close());
+            peerConnectionsRef.current.clear();
+            pendingIceCandidatesRef.current.clear();
+
             if (!localStreamRef.current) {
                 await initLocalStream();
             }
@@ -618,25 +656,6 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 user,
                 passcode: currentPass,
             });
-        });
-
-        // Auto-reconnect: re-join room on socket reconnect (handles mobile network drops)
-        socket.on("reconnect", () => {
-            if (isReconnectingRef.current) return;
-            isReconnectingRef.current = true;
-            reconnectAttemptsRef.current += 1;
-            // Re-establish peer connections after socket reconnect
-            peerConnectionsRef.current.forEach((pc) => pc.close());
-            peerConnectionsRef.current.clear();
-            pendingIceCandidatesRef.current.clear();
-            setParticipants(new Map());
-            const currentPass = (passcodeRef.current !== undefined ? passcodeRef.current : passcode)?.trim();
-            socket.emit("join-room", {
-                roomId,
-                user,
-                passcode: currentPass,
-            });
-            isReconnectingRef.current = false;
         });
 
         socket.on("room-joined", async ({ yourSocketId, isHost: hostStatus, isCoHost: coHostStatus, settings, existingParticipants }) => {
@@ -683,6 +702,10 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         });
 
         socket.on("webrtc-offer", async ({ senderSocketId, offer }) => {
+            // Ensure local tracks are acquired before creating answer
+            if (!localStreamRef.current) {
+                await initLocalStream();
+            }
             const pc = createPeerConnection(senderSocketId, socket);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -723,6 +746,18 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             }
         });
 
+        socket.on("participant-speaking", ({ socketId, isSpeaking }: { socketId: string; isSpeaking: boolean }) => {
+            setSpeakingSockets((prev) => {
+                const next = new Set(prev);
+                if (isSpeaking) {
+                    next.add(socketId);
+                } else {
+                    next.delete(socketId);
+                }
+                return next;
+            });
+        });
+
         socket.on("participant-updated", (updatedP: Participant) => {
             setParticipants((prev) => {
                 const next = new Map(prev);
@@ -737,6 +772,12 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         socket.on("user-left", ({ socketId }) => {
             setParticipants((prev) => {
                 const next = new Map(prev);
+                next.delete(socketId);
+                return next;
+            });
+
+            setSpeakingSockets((prev) => {
+                const next = new Set(prev);
                 next.delete(socketId);
                 return next;
             });

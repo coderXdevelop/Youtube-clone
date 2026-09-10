@@ -88,6 +88,26 @@ export const setupMeetingSocket = (io) => {
                 currentRoomId = roomId;
                 currentUserId = userIdStr;
 
+                // Clean up any stale/previous socket connection for this user in this room
+                if (userIdStr && userIdStr !== "anonymous") {
+                    for (const [existingSocketId, existingParticipant] of roomState.participants.entries()) {
+                        if (existingParticipant.userId === userIdStr && existingSocketId !== socket.id) {
+                            console.log(`[Socket] Cleaning up previous socket ${existingSocketId} for user ${userIdStr}`);
+                            io.to(roomId).emit("user-left", {
+                                socketId: existingSocketId,
+                                userId: existingParticipant.userId,
+                                name: existingParticipant.name,
+                            });
+                            const oldSocket = io.sockets.sockets.get(existingSocketId);
+                            if (oldSocket) {
+                                oldSocket.leave(roomId);
+                                oldSocket.emit("force-kicked", { message: "You rejoined from another window or connection." });
+                            }
+                            roomState.participants.delete(existingSocketId);
+                        }
+                    }
+                }
+
                 const isCoHost = roomState.coHostUserIds.has(userIdStr);
                 const participantData = {
                     socketId: socket.id,
@@ -150,6 +170,15 @@ export const setupMeetingSocket = (io) => {
             io.to(targetSocketId).emit("ice-candidate", {
                 senderSocketId: socket.id,
                 candidate,
+            });
+        });
+
+        // Speaking indicator broadcast
+        socket.on("speaking-change", ({ roomId, isSpeaking }) => {
+            if (!roomId) return;
+            socket.to(roomId).emit("participant-speaking", {
+                socketId: socket.id,
+                isSpeaking: Boolean(isSpeaking),
             });
         });
 
