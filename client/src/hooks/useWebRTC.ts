@@ -218,6 +218,12 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                             echoCancellation: true,
                             noiseSuppression: true,
                             autoGainControl: true,
+                            // @ts-ignore — Chrome-specific constraint for stronger AEC
+                            googEchoCancellation: true,
+                            // @ts-ignore
+                            googAutoGainControl: true,
+                            // @ts-ignore
+                            googNoiseSuppression: true,
                             deviceId: customAudioDeviceId ? { ideal: customAudioDeviceId } : (selectedAudioDevice ? { ideal: selectedAudioDevice } : undefined),
                         },
                         video: customVideoDeviceId
@@ -546,22 +552,6 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 }
             };
 
-            // Renegotiate when tracks are added/removed after initial negotiation
-            // (e.g. late stream acquisition adds tracks to an existing PC)
-            pc.onnegotiationneeded = async () => {
-                try {
-                    // Only renegotiate from stable state to avoid glare
-                    if (pc.signalingState !== 'stable') return;
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-                    socket.emit("webrtc-offer", {
-                        targetSocketId,
-                        offer: pc.localDescription,
-                    });
-                } catch (err) {
-                    console.warn("[WebRTC] Renegotiation failed:", err);
-                }
-            };
 
             return pc;
         },
