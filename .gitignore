@@ -10,9 +10,12 @@ node_modules/
 out/
 build/
 dist/
+.turbo/
+.cache/
 
 # testing & coverage
 coverage/
+*.lcov
 
 # secrets & credentials
 .env
@@ -42,9 +45,29 @@ yarn-error.log*
 # system & OS
 .DS_Store
 Thumbs.db
+desktop.ini
 *.pem
+
+# IDE & editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
 
 # typescript & vercel
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# AI / Agent & scratch files
+AGENTS.md
+agents.md
+task.md
+tasks.md
+CLAUDE*.md
+**/CLAUDE*.md
+scratch/
+.agents/
+.gemini/

@@ -29,8 +29,21 @@ yarn-debug.log*
 # system & OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# IDE & editors
+.vscode/
+.idea/
+
+# AI & scratch files
+CLAUDE*.md
+task.md
+tasks.md
+AGENTS.md
+agents.md
 
 # typescript & vercel
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
