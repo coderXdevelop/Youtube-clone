@@ -887,7 +887,66 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                     </div>
                 </div>
             </footer>
+            {/* Global Dedicated Audio Sinks for all remote participants (always mounted, never interrupted by video grid/spotlight) */}
+            <div className="sr-only" aria-hidden="true">
+                {participantList.map((p) => (
+                    <ParticipantAudio key={`audio-${p.socketId}`} participant={p} />
+                ))}
+            </div>
         </div>
+    );
+};
+
+// Dedicated background audio sink component for each remote participant
+const ParticipantAudio: React.FC<{ participant: Participant }> = ({ participant }) => {
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        if (participant.stream) {
+            if (audio.srcObject !== participant.stream) {
+                audio.srcObject = participant.stream;
+            }
+            audio.volume = 1.0;
+
+            const playAudio = () => {
+                audio.play().catch((e) => {
+                    console.debug(`[Audio] Autoplay blocked for participant ${participant.name}:`, e);
+                    const unlockAudio = () => {
+                        audio.play().catch(() => {});
+                        window.removeEventListener("click", unlockAudio);
+                        window.removeEventListener("keydown", unlockAudio);
+                        window.removeEventListener("touchstart", unlockAudio);
+                    };
+                    window.addEventListener("click", unlockAudio, { once: true });
+                    window.addEventListener("keydown", unlockAudio, { once: true });
+                    window.addEventListener("touchstart", unlockAudio, { once: true });
+                });
+            };
+
+            playAudio();
+
+            const stream = participant.stream;
+            const handleTrackAdded = () => {
+                playAudio();
+            };
+            stream.addEventListener("addtrack", handleTrackAdded);
+            return () => {
+                stream.removeEventListener("addtrack", handleTrackAdded);
+            };
+        } else {
+            audio.srcObject = null;
+        }
+    }, [participant.stream, participant.name]);
+
+    return (
+        <audio
+            ref={audioRef}
+            autoPlay
+            playsInline
+        />
     );
 };
 
@@ -899,7 +958,6 @@ const RemoteVideoTile: React.FC<{
     onSpotlightToggle: () => void;
 }> = ({ participant, isSpeaking, isSpotlight, onSpotlightToggle }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         if (participant.stream) {
@@ -914,27 +972,6 @@ const RemoteVideoTile: React.FC<{
                     });
                 }
             }
-
-            const audio = audioRef.current;
-            if (audio) {
-                if (audio.srcObject !== participant.stream) {
-                    audio.srcObject = participant.stream;
-                }
-                audio.volume = 1.0;
-                audio.play().catch((e) => {
-                    console.debug("Remote audio autoplay caught, waiting for user gesture:", e);
-                    // Attach one-time window click/keydown listener to unlock audio if blocked by autoplay policy
-                    const unlockAudio = () => {
-                        audio.play().catch(() => {});
-                        window.removeEventListener("click", unlockAudio);
-                        window.removeEventListener("keydown", unlockAudio);
-                        window.removeEventListener("touchstart", unlockAudio);
-                    };
-                    window.addEventListener("click", unlockAudio, { once: true });
-                    window.addEventListener("keydown", unlockAudio, { once: true });
-                    window.addEventListener("touchstart", unlockAudio, { once: true });
-                });
-            }
         }
     }, [participant.stream, participant.isCameraOff]);
 
@@ -947,21 +984,13 @@ const RemoteVideoTile: React.FC<{
                 isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/40" : "border-neutral-800"
             }`}
         >
-            {/* Muted video element for rendering video frames only (avoids duplicate audio echo) */}
+            {/* Muted video element for rendering video frames only */}
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
                 className={`w-full h-full object-cover ${showAvatar ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"}`}
-            />
-
-            {/* Dedicated single audio sink for this participant's audio stream */}
-            <audio
-                ref={audioRef}
-                autoPlay
-                playsInline
-                style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" }}
             />
 
             {/* Fallback avatar overlay shown when camera is off or stream is not ready */}

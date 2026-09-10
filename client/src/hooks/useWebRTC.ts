@@ -238,15 +238,28 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
                     // Update tracks in existing peer connections
                     peerConnectionsRef.current.forEach((pc) => {
-                        const senders = pc.getSenders();
-                        stream.getTracks().forEach((track) => {
-                            const sender = senders.find((s) => s.track?.kind === track.kind);
-                            if (sender) {
-                                sender.replaceTrack(track);
+                        const transceivers = pc.getTransceivers();
+                        const audioTransceiver = transceivers.find((t) => t.receiver.track.kind === "audio");
+                        const videoTransceiver = transceivers.find((t) => t.receiver.track.kind === "video");
+
+                        const audioTrack = stream.getAudioTracks()[0];
+                        const videoTrack = stream.getVideoTracks()[0];
+
+                        if (audioTrack) {
+                            if (audioTransceiver) {
+                                audioTransceiver.sender.replaceTrack(audioTrack).catch((e) => console.debug("Audio replaceTrack caught:", e));
                             } else {
-                                pc.addTrack(track, stream);
+                                pc.addTrack(audioTrack, stream);
                             }
-                        });
+                        }
+
+                        if (videoTrack) {
+                            if (videoTransceiver) {
+                                videoTransceiver.sender.replaceTrack(videoTrack).catch((e) => console.debug("Video replaceTrack caught:", e));
+                            } else {
+                                pc.addTrack(videoTrack, stream);
+                            }
+                        }
                     });
 
                     await enumerateDevices();
@@ -268,15 +281,28 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                         setMediaPermissionState({ camera: "granted", audio: "granted" });
 
                         peerConnectionsRef.current.forEach((pc) => {
-                            const senders = pc.getSenders();
-                            basicStream.getTracks().forEach((track) => {
-                                const sender = senders.find((s) => s.track?.kind === track.kind);
-                                if (sender) {
-                                    sender.replaceTrack(track);
+                            const transceivers = pc.getTransceivers();
+                            const audioTransceiver = transceivers.find((t) => t.receiver.track.kind === "audio");
+                            const videoTransceiver = transceivers.find((t) => t.receiver.track.kind === "video");
+
+                            const audioTrack = basicStream.getAudioTracks()[0];
+                            const videoTrack = basicStream.getVideoTracks()[0];
+
+                            if (audioTrack) {
+                                if (audioTransceiver) {
+                                    audioTransceiver.sender.replaceTrack(audioTrack).catch((e) => console.debug("Audio replaceTrack caught:", e));
                                 } else {
-                                    pc.addTrack(track, basicStream);
+                                    pc.addTrack(audioTrack, basicStream);
                                 }
-                            });
+                            }
+
+                            if (videoTrack) {
+                                if (videoTransceiver) {
+                                    videoTransceiver.sender.replaceTrack(videoTrack).catch((e) => console.debug("Video replaceTrack caught:", e));
+                                } else {
+                                    pc.addTrack(videoTrack, basicStream);
+                                }
+                            }
                         });
 
                         await enumerateDevices();
@@ -299,15 +325,17 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                             setMediaPermissionState({ camera: "denied", audio: "granted" });
 
                             peerConnectionsRef.current.forEach((pc) => {
-                                const senders = pc.getSenders();
-                                audioStream.getTracks().forEach((track) => {
-                                    const sender = senders.find((s) => s.track?.kind === track.kind);
-                                    if (sender) {
-                                        sender.replaceTrack(track);
+                                const transceivers = pc.getTransceivers();
+                                const audioTransceiver = transceivers.find((t) => t.receiver.track.kind === "audio");
+                                const audioTrack = audioStream.getAudioTracks()[0];
+
+                                if (audioTrack) {
+                                    if (audioTransceiver) {
+                                        audioTransceiver.sender.replaceTrack(audioTrack).catch((e) => console.debug("Audio replaceTrack caught:", e));
                                     } else {
-                                        pc.addTrack(track, audioStream);
+                                        pc.addTrack(audioTrack, audioStream);
                                     }
-                                });
+                                }
                             });
 
                             await enumerateDevices();
@@ -411,22 +439,25 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             const pc = new RTCPeerConnection(ICE_SERVERS);
             peerConnectionsRef.current.set(targetSocketId, pc);
 
-            // Add local stream tracks to PC
-            if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach((track) => {
-                    pc.addTrack(track, localStreamRef.current!);
-                });
+            const stream = localStreamRef.current;
+            const audioTrack = stream?.getAudioTracks()[0];
+            const videoTrack = stream?.getVideoTracks()[0];
+
+            // Always add audio transceiver/track first, video transceiver/track second
+            if (audioTrack && stream) {
+                pc.addTrack(audioTrack, stream);
+            } else {
+                try {
+                    pc.addTransceiver("audio", { direction: "sendrecv" });
+                } catch (e) {}
             }
 
-            // Ensure audio & video transceivers are configured for bidirectional media exchange
-            const senders = pc.getSenders();
-            const hasAudioSender = senders.some((s) => s.track?.kind === "audio");
-            const hasVideoSender = senders.some((s) => s.track?.kind === "video");
-            if (!hasAudioSender) {
-                try { pc.addTransceiver("audio", { direction: "sendrecv" }); } catch (e) {}
-            }
-            if (!hasVideoSender) {
-                try { pc.addTransceiver("video", { direction: "sendrecv" }); } catch (e) {}
+            if (videoTrack && stream) {
+                pc.addTrack(videoTrack, stream);
+            } else {
+                try {
+                    pc.addTransceiver("video", { direction: "sendrecv" });
+                } catch (e) {}
             }
 
             // Handle ICE candidates
@@ -442,26 +473,26 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             // Handle incoming remote track (both audio and video)
             pc.ontrack = (event) => {
                 const incomingTrack = event.track;
+                const remoteMediaStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+
                 setParticipants((prev) => {
                     const next = new Map(prev);
                     const existing = next.get(targetSocketId);
-                    let baseStream: MediaStream;
-                    if (existing?.stream) {
-                        baseStream = existing.stream;
-                    } else if (event.streams && event.streams[0]) {
-                        baseStream = event.streams[0];
+                    
+                    let streamToBind: MediaStream;
+                    if (remoteMediaStream) {
+                        streamToBind = remoteMediaStream;
+                    } else if (existing?.stream) {
+                        streamToBind = existing.stream;
+                        if (!streamToBind.getTracks().some((t) => t.id === incomingTrack.id)) {
+                            streamToBind.addTrack(incomingTrack);
+                        }
                     } else {
-                        baseStream = new MediaStream();
+                        streamToBind = new MediaStream([incomingTrack]);
                     }
 
-                    if (!baseStream.getTracks().some((t) => t.id === incomingTrack.id)) {
-                        baseStream.addTrack(incomingTrack);
-                    }
-
-                    // Create a fresh MediaStream instance so React triggers media element updates
-                    const updatedStream = new MediaStream(baseStream.getTracks());
                     if (existing) {
-                        next.set(targetSocketId, { ...existing, stream: updatedStream });
+                        next.set(targetSocketId, { ...existing, stream: streamToBind });
                     } else {
                         next.set(targetSocketId, {
                             socketId: targetSocketId,
@@ -474,7 +505,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                             isHandRaised: false,
                             isHost: false,
                             isCoHost: false,
-                            stream: updatedStream,
+                            stream: streamToBind,
                         });
                     }
                     return next;
