@@ -431,9 +431,19 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
 
     // Create RTCPeerConnection for target peer socket
     const createPeerConnection = useCallback(
-        (targetSocketId: string, socket: Socket) => {
-            if (peerConnectionsRef.current.has(targetSocketId)) {
-                return peerConnectionsRef.current.get(targetSocketId)!;
+        (targetSocketId: string, socket: Socket, forceRecreate: boolean = false) => {
+            const existingPc = peerConnectionsRef.current.get(targetSocketId);
+            if (existingPc) {
+                // Reuse healthy connection unless caller demands a fresh one
+                const isDead = existingPc.connectionState === 'closed' || existingPc.connectionState === 'failed';
+                if (!forceRecreate && !isDead) {
+                    return existingPc;
+                }
+                // Tear down stale / dead connection before creating a fresh one
+                console.log(`[WebRTC] Recreating peer connection for ${targetSocketId} (force=${forceRecreate}, state=${existingPc.connectionState})`);
+                try { existingPc.close(); } catch (_) {}
+                peerConnectionsRef.current.delete(targetSocketId);
+                pendingIceCandidatesRef.current.delete(targetSocketId);
             }
 
             const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -533,6 +543,23 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                     setConnectionQuality("Fair");
                 } else if (pc.connectionState === "connected") {
                     setConnectionQuality("Good");
+                }
+            };
+
+            // Renegotiate when tracks are added/removed after initial negotiation
+            // (e.g. late stream acquisition adds tracks to an existing PC)
+            pc.onnegotiationneeded = async () => {
+                try {
+                    // Only renegotiate from stable state to avoid glare
+                    if (pc.signalingState !== 'stable') return;
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit("webrtc-offer", {
+                        targetSocketId,
+                        offer: pc.localDescription,
+                    });
+                } catch (err) {
+                    console.warn("[WebRTC] Renegotiation failed:", err);
                 }
             };
 
@@ -737,7 +764,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             if (!localStreamRef.current) {
                 await initLocalStream();
             }
-            const pc = createPeerConnection(senderSocketId, socket);
+            // Force-recreate the PC so we always answer with a clean connection
+            // that has the current local audio+video tracks attached.
+            // This prevents the bug where a stale PC (created before the
+            // local stream was ready) has no audio track, causing one-way audio.
+            const pc = createPeerConnection(senderSocketId, socket, true);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 await processPendingIceCandidates(senderSocketId, pc);
