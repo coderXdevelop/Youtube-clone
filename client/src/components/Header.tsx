@@ -136,15 +136,15 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 {user ? (
                     <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className={cn("h-8 w-8 sm:h-9 sm:w-9 hidden md:inline-flex", isLight ? "text-gray-800 hover:bg-gray-100" : "text-white hover:bg-neutral-800")}
-                            onClick={() => setIsDialogueOpen(true)}
-                            title="Create"
-                        >
-                            <VideoIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </Button>
+                        <Link href="/meet" title="Video Calls & Meetings">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn("h-8 w-8 sm:h-9 sm:w-9 hidden md:inline-flex cursor-pointer", isLight ? "text-gray-800 hover:bg-gray-100" : "text-white hover:bg-neutral-800")}
+                            >
+                                <VideoIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </Button>
+                        </Link>
                         <DropdownMenu>
                             <DropdownMenuTrigger className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full flex items-center justify-center hover:ring-2 hover:ring-offset-1 hover:ring-gray-300 dark:hover:ring-neutral-700 transition-all outline-none cursor-pointer">
                                 <Avatar className="h-8 w-8 sm:h-9 sm:w-9">

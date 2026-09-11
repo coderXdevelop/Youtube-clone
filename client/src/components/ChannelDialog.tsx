@@ -13,6 +13,7 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import axiosInstance from "@/lib/AxiosInstance";
 import { useUser } from "@/lib/AuthContext";
+import DeleteChannelModal from "./DeleteChannelModal";
 
 interface ChannelDialogProps {
     isopen: boolean;
@@ -32,6 +33,7 @@ const Channeldialogue = ({ isopen, onclose, channeldata, mode }: ChannelDialogPr
         description: mode === "edit" ? channeldata?.description || "" : "",
     });
     const [isSubmitting, setisSubmitting] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
     // Sync form state when dialog opens or incoming props change during render to prevent cascading renders
     const [prevSyncKey, setPrevSyncKey] = useState<string | null>(null);
@@ -112,6 +114,29 @@ const Channeldialogue = ({ isopen, onclose, channeldata, mode }: ChannelDialogPr
                         />
                     </div>
 
+                    {mode === "edit" && user?._id && (
+                        <div className="pt-4 border-t border-gray-100 dark:border-zinc-800 flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-semibold text-red-600 dark:text-red-400">Danger Zone</p>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Permanently wipe your channel and all uploaded videos
+                                </p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    onclose();
+                                    setIsDeleteModalOpen(true);
+                                }}
+                                className="text-xs border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer"
+                            >
+                                Delete Channel
+                            </Button>
+                        </div>
+                    )}
+
                     <DialogFooter className="flex justify-between sm:justify-between">
                         <Button type="button" variant="outline" onClick={onclose}>
                             Cancel
@@ -126,6 +151,16 @@ const Channeldialogue = ({ isopen, onclose, channeldata, mode }: ChannelDialogPr
                     </DialogFooter>
                 </form>
             </DialogContent>
+
+            {mode === "edit" && user?._id && (
+                <DeleteChannelModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    channelId={user._id}
+                    channelName={formData.name || user.channelname || user.name || "My Channel"}
+                    userEmail={user.email}
+                />
+            )}
         </Dialog>
     );
 };

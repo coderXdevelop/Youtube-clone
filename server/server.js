@@ -13,6 +13,8 @@ import downloadRoute from "./routes/downloadRoute.js";
 import subscriptionRoute from "./routes/subscriptionRoute.js";
 import paymentRoute from "./routes/paymentRoute.js";
 import channelSubscriptionRoute from "./routes/channelSubscriptionRoute.js";
+import communityRoute from "./routes/communityRoute.js";
+import playlistRoute from "./routes/playlistRoute.js";
 
 import http from "http";
 import { Server } from "socket.io";
@@ -96,6 +98,8 @@ app.use("/api/download", downloadRoute);
 app.use("/api/subscription", subscriptionRoute);
 app.use("/api/channel-subscription", channelSubscriptionRoute);
 app.use("/api/channel", channelSubscriptionRoute);
+app.use("/api/community", communityRoute);
+app.use("/api/playlist", playlistRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/meeting", meetingRoute);
 app.use("/api", paymentRoute);

@@ -1,8 +1,21 @@
 import mongoose from "mongoose";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import User from "../model/user.js";
 import LoginHistory from "../model/loginHistory.js";
 import LoginOtpChallenge from "../model/loginOtpChallenge.js";
+import Video from "../model/video.js";
+import Comment from "../model/comment.js";
+import CommentReport from "../model/commentReport.js";
+import ChannelSubscription from "../model/channelSubscription.js";
+import Like from "../model/like.js";
+import History from "../model/history.js";
+import WatchLater from "../model/watchlater.js";
+import DownloadRecord from "../model/downloadRecord.js";
+import Caption from "../model/caption.js";
+import CommunityPost from "../model/communityPost.js";
+import Playlist from "../model/playlist.js";
 import {
     computeIstTheme,
     parseUserAgent,
@@ -692,5 +705,187 @@ export const getuserprofile = async (req, res) => {
     } catch (error) {
         console.error("getuserprofile error:", error);
         return res.status(500).json({ message: "Something went wrong" });
+    }
+};
+
+/**
+ * Delete a creator's channel completely:
+ * - Verifies requesting user is the channel owner
+ * - Deletes all uploaded videos and files (master, variants, thumbnails, HLS folders)
+ * - Deletes all comments on the channel's videos + comments made by this channel
+ * - Deletes likes, watch history, watch later, captions, and download records for those videos
+ * - Removes channel from all other users' subscribed channels list (ChannelSubscription)
+ * - Resets channel profile on the user document (channelname, discription, subscribersCount)
+ * DELETE /api/user/channel/:id
+ */
+export const deleteChannel = async (req, res) => {
+    const { id: channelId } = req.params;
+    const requestingUserId =
+        req.body?.userId ||
+        req.query?.userId ||
+        req.headers?.["x-user-id"];
+    const confirmName = req.body?.confirmName || req.body?.confirmationText;
+
+    if (!mongoose.Types.ObjectId.isValid(channelId)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid channel ID format.",
+        });
+    }
+
+    if (!requestingUserId || !mongoose.Types.ObjectId.isValid(requestingUserId)) {
+        return res.status(401).json({
+            success: false,
+            message: "Authentication required to perform channel deletion.",
+        });
+    }
+
+    // Ownership check: only the channel owner (or admin) can delete the channel
+    if (requestingUserId.toString() !== channelId.toString()) {
+        const requestingUser = await User.findById(requestingUserId);
+        const isAdmin = requestingUser?.user_type === "admin" || requestingUser?.isadmin === true;
+        if (!isAdmin) {
+            return res.status(403).json({
+                success: false,
+                message: "You are not authorized to delete this channel.",
+            });
+        }
+    }
+
+    try {
+        const targetUser = await User.findById(channelId);
+        if (!targetUser) {
+            return res.status(404).json({
+                success: false,
+                message: "Channel / user not found.",
+            });
+        }
+
+        // Verify confirmation name if provided
+        if (confirmName !== undefined) {
+            const expectedNames = [
+                targetUser.channelname?.trim().toLowerCase(),
+                targetUser.name?.trim().toLowerCase(),
+                targetUser.email?.trim().toLowerCase(),
+                "delete",
+            ].filter(Boolean);
+
+            const provided = String(confirmName).trim().toLowerCase();
+            if (!expectedNames.includes(provided)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Confirmation name does not match the channel name or user email.",
+                });
+            }
+        }
+
+        // 1. Find all videos uploaded by this channel
+        const videoConditions = [{ uploader: channelId }];
+        if (targetUser.channelname) {
+            videoConditions.push({ videochanel: targetUser.channelname });
+        }
+        if (targetUser.name) {
+            videoConditions.push({ videochanel: targetUser.name });
+        }
+
+        const channelVideos = await Video.find({ $or: videoConditions });
+        const videoIds = channelVideos.map((v) => v._id);
+
+        // 2. Clean up media and files from disk
+        for (const vid of channelVideos) {
+            const filesToDelete = new Set();
+            if (vid.filepath) filesToDelete.add(vid.filepath);
+            if (Array.isArray(vid.qualityvariants)) {
+                vid.qualityvariants.forEach((v) => {
+                    if (v?.filepath) filesToDelete.add(v.filepath);
+                });
+            }
+
+            filesToDelete.forEach((fPath) => {
+                try {
+                    const absPath = path.resolve(fPath.replace(/^\/+/, ""));
+                    if (fs.existsSync(absPath)) {
+                        fs.unlinkSync(absPath);
+                    }
+                } catch (fileErr) {
+                    console.warn("Could not delete video file from disk:", fileErr.message);
+                }
+            });
+
+            // Thumbnails
+            if (vid.thumbnailpath) {
+                try {
+                    const thumbAbs = path.resolve(vid.thumbnailpath.replace(/^\/+/, ""));
+                    if (fs.existsSync(thumbAbs)) {
+                        fs.unlinkSync(thumbAbs);
+                    }
+                } catch (thumbErr) {
+                    console.warn("Could not delete thumbnail file from disk:", thumbErr.message);
+                }
+            }
+
+            // HLS directory
+            try {
+                const hlsDirPath = path.resolve(path.join("uploads", "hls", String(vid._id)));
+                if (fs.existsSync(hlsDirPath)) {
+                    fs.rmSync(hlsDirPath, { recursive: true, force: true });
+                }
+            } catch (hlsErr) {
+                console.warn("Could not delete HLS directory from disk:", hlsErr.message);
+            }
+        }
+
+        // 3. Cascade database deletions for all channel videos
+        if (videoIds.length > 0) {
+            await Promise.allSettled([
+                Comment.deleteMany({ videoid: { $in: videoIds } }),
+                CommentReport.deleteMany({ videoid: { $in: videoIds } }),
+                Caption.deleteMany({ videoid: { $in: videoIds } }),
+                Like.deleteMany({ videoid: { $in: videoIds } }),
+                History.deleteMany({ videoid: { $in: videoIds } }),
+                WatchLater.deleteMany({ videoid: { $in: videoIds } }),
+                DownloadRecord.deleteMany({ videoid: { $in: videoIds } }),
+                Video.deleteMany({ _id: { $in: videoIds } }),
+            ]);
+        }
+
+        // 4. Cascade delete comments made by this user across the platform, community announcements & playlists
+        await Promise.allSettled([
+            Comment.deleteMany({ userid: channelId }),
+            CommentReport.deleteMany({ reportedby: channelId }),
+            CommunityPost.deleteMany({ channelId: channelId }),
+            Playlist.deleteMany({ channelId: channelId }),
+        ]);
+
+        // 5. Remove channel from all other users' subscribed lists (ChannelSubscription)
+        const deletedSubs = await ChannelSubscription.deleteMany({ channelId: channelId });
+
+        // 6. Reset channel data on User document
+        const updatedUser = await User.findByIdAndUpdate(
+            channelId,
+            {
+                $set: {
+                    channelname: "",
+                    discription: "",
+                    subscribersCount: 0,
+                },
+            },
+            { new: true }
+        ).select("-__v");
+
+        return res.status(200).json({
+            success: true,
+            message: "Channel and all associated videos, comments, and subscribers have been permanently deleted.",
+            deletedVideosCount: videoIds.length,
+            deletedSubscriptionsCount: deletedSubs?.deletedCount || 0,
+            user: updatedUser,
+        });
+    } catch (error) {
+        console.error("deleteChannel error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete channel.",
+            error: error.message,
+        });
     }
 };

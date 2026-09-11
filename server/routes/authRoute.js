@@ -7,6 +7,7 @@ import {
     updateThemePreference,
     updateprofile,
     getuserprofile,
+    deleteChannel,
 } from "../controller/authController.js";
 import { Router } from "express";
 
@@ -22,9 +23,11 @@ router.get("/security/:id", getSecurityInfo);
 router.post("/revoke-device", revokeTrustedDevice);
 router.post("/theme-preference", updateThemePreference);
 
-// Profile
+// Profile & Channel Management
 router.post("/update/:id", updateprofile);
 router.patch("/update/:id", updateprofile);
+router.delete("/channel/:id", deleteChannel);
+router.delete("/delete-channel/:id", deleteChannel);
 router.get("/profile/:id", getuserprofile);
 router.get("/:id", getuserprofile);
 
