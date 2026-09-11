@@ -1,8 +1,7 @@
--import React from "react";
+import React from "react";
 import {
     Home,
     Video as VideoIcon,
-    Flame,
     ListVideo,
     MessageSquare,
     Info,
