@@ -225,9 +225,9 @@ export const addVideoToPlaylist = async (req, res) => {
             });
         }
 
-        const videoIdObj = new mongoose.Types.ObjectId(videoId);
-        if (!playlist.videos.some((id) => id.equals(videoIdObj))) {
-            playlist.videos.push(videoIdObj);
+        const videoIdStr = videoId.toString();
+        if (!playlist.videos.some((id) => (id?._id || id)?.toString() === videoIdStr)) {
+            playlist.videos.push(new mongoose.Types.ObjectId(videoIdStr));
             await playlist.save();
         }
 
@@ -276,8 +276,8 @@ export const removeVideoFromPlaylist = async (req, res) => {
             });
         }
 
-        const videoIdObj = new mongoose.Types.ObjectId(videoId);
-        playlist.videos = playlist.videos.filter((id) => !id.equals(videoIdObj));
+        const videoIdStr = videoId.toString();
+        playlist.videos = playlist.videos.filter((id) => (id?._id || id)?.toString() !== videoIdStr);
         await playlist.save();
 
         const updatedPlaylist = await Playlist.findById(playlistId).populate({

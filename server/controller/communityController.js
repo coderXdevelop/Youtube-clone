@@ -148,44 +148,51 @@ export const toggleReaction = async (req, res) => {
             return res.status(404).json({ success: false, message: "Post not found." });
         }
 
-        const userIdObj = new mongoose.Types.ObjectId(userId);
-        const hasLiked = post.likes.some((id) => id.equals(userIdObj));
-        const hasDisliked = post.dislikes.some((id) => id.equals(userIdObj));
+        if (!Array.isArray(post.likes)) post.likes = [];
+        if (!Array.isArray(post.dislikes)) post.dislikes = [];
+
+        const userIdStr = userId.toString();
+        const hasLiked = post.likes.some((id) => (id?._id || id)?.toString() === userIdStr);
+        const hasDisliked = post.dislikes.some((id) => (id?._id || id)?.toString() === userIdStr);
 
         if (reactionType === "like") {
             if (hasLiked) {
                 // Remove like
-                post.likes = post.likes.filter((id) => !id.equals(userIdObj));
+                post.likes = post.likes.filter((id) => (id?._id || id)?.toString() !== userIdStr);
             } else {
                 // Add like & remove dislike
-                post.likes.push(userIdObj);
-                post.dislikes = post.dislikes.filter((id) => !id.equals(userIdObj));
+                post.likes.push(new mongoose.Types.ObjectId(userIdStr));
+                post.dislikes = post.dislikes.filter((id) => (id?._id || id)?.toString() !== userIdStr);
             }
         } else if (reactionType === "dislike") {
             if (hasDisliked) {
                 // Remove dislike
-                post.dislikes = post.dislikes.filter((id) => !id.equals(userIdObj));
+                post.dislikes = post.dislikes.filter((id) => (id?._id || id)?.toString() !== userIdStr);
             } else {
                 // Add dislike & remove like
-                post.dislikes.push(userIdObj);
-                post.likes = post.likes.filter((id) => !id.equals(userIdObj));
+                post.dislikes.push(new mongoose.Types.ObjectId(userIdStr));
+                post.likes = post.likes.filter((id) => (id?._id || id)?.toString() !== userIdStr);
             }
         }
 
         await post.save();
 
+        const isLikedNow = post.likes.some((id) => (id?._id || id)?.toString() === userIdStr);
+        const isDislikedNow = post.dislikes.some((id) => (id?._id || id)?.toString() === userIdStr);
+
         return res.status(200).json({
             success: true,
             likesCount: post.likes.length,
             dislikesCount: post.dislikes.length,
-            isLiked: post.likes.some((id) => id.equals(userIdObj)),
-            isDisliked: post.dislikes.some((id) => id.equals(userIdObj)),
+            isLiked: isLikedNow,
+            isDisliked: isDislikedNow,
         });
     } catch (error) {
         console.error("toggleReaction error:", error);
         return res.status(500).json({
             success: false,
             message: "Failed to update reaction.",
+            error: error.message,
         });
     }
 };
