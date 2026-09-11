@@ -1,4 +1,4 @@
-import React from "react";
+-import React from "react";
 import {
     Home,
     Video as VideoIcon,
@@ -55,4 +55,4 @@ const Channeltabs: React.FC<ChanneltabsProps> = ({ activeTab = "videos", onTabCh
     );
 };
 
-export default Channeltabs;
+export default Channeltabs;
