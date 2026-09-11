@@ -5,7 +5,6 @@ import { getMediaUrl } from "@/lib/playerUtils";
 import {
   Clock,
   Download,
-  MoreHorizontal,
   Share,
   ThumbsDown,
   ThumbsUp,
@@ -497,14 +496,6 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
               <span>Delete Video</span>
             </Button>
           )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-gray-100 dark:bg-zinc-800 rounded-full h-8 w-8 sm:h-9 sm:w-9 shrink-0"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </Button>
         </div>
       </div>
 
