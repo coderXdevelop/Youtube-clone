@@ -5,7 +5,7 @@ import {
     verifySubscriptionPayment,
     getBillingHistory,
     cancelUserSubscription,
-    resetUserSubscriptionToFree,
+    //resetUserSubscriptionToFree,
 } from "../controller/subscriptionController.js";
 
 const router = express.Router();
@@ -15,6 +15,6 @@ router.post("/create-order", createRazorpayOrder);
 router.post("/verify-payment", verifySubscriptionPayment);
 router.get("/billing-history/:userId", getBillingHistory);
 router.post("/cancel", cancelUserSubscription);
-router.post("/reset", resetUserSubscriptionToFree);
+//router.post("/reset", resetUserSubscriptionToFree);
 
 export default router;

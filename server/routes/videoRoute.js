@@ -16,6 +16,10 @@ import {
     uploadCustomCaption,
     deleteCaption,
 } from "../controller/captionController.js";
+import {
+    handleVoiceTranscribe,
+    voiceAudioUpload,
+} from "../controller/voiceSearchController.js";
 import upload from "../filehelper/filehelper.js";
 
 const routes = express.Router();
@@ -29,6 +33,9 @@ routes.get("/stream/:id", streamVideoAuthorized);
 routes.post("/heartbeat", recordWatchHeartbeat);
 routes.delete("/:id", deleteVideo);
 routes.delete("/delete/:id", deleteVideo);
+
+// Voice Search Transcription Endpoint
+routes.post("/voice-transcribe", voiceAudioUpload.single("audio"), handleVoiceTranscribe);
 
 // Video Captions / Subtitles Endpoints
 routes.get("/captions/:id", getCaptionsByVideoId);

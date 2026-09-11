@@ -355,3 +355,52 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
         return null;
     }
 };
+
+/**
+ * Transcribe a short voice search audio clip (uploaded from browser mic)
+ */
+export const transcribeAudioQuery = async (audioFilePath) => {
+    const tempDir = path.resolve(path.join("uploads", "temp"));
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const tempWavPath = path.join(
+        tempDir,
+        `voice_query_${Date.now()}_${Math.random().toString(36).substring(2)}.wav`
+    );
+
+    try {
+        console.log(`[CaptionService] 🎙️ Processing voice search query from ${audioFilePath}...`);
+        // 1. Extract/convert to 16kHz mono WAV
+        await extractAudioForStt(audioFilePath, tempWavPath);
+
+        // 2. Transcribe via Groq (fast) or local Whisper
+        let cues = await transcribeWithGroq(tempWavPath);
+        if (!cues || cues.length === 0) {
+            cues = await transcribeWithLocalWhisper(tempWavPath);
+        }
+
+        if (cues && cues.length > 0) {
+            const fullText = cues
+                .map((c) => c.text)
+                .join(" ")
+                .replace(/\[(?:dramatic music|MUSIC PLAYING|MUSIC|music|sound|applause)\]\s*/gi, "")
+                .replace(/\[.*?\]/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+            return fullText;
+        }
+        return "";
+    } catch (err) {
+        console.error("[CaptionService] ❌ Voice search query transcription failed:", err);
+        return "";
+    } finally {
+        if (fs.existsSync(tempWavPath)) {
+            try {
+                fs.unlinkSync(tempWavPath);
+            } catch (e) {}
+        }
+    }
+};
+

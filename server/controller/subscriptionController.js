@@ -493,7 +493,7 @@ export const cancelUserSubscription = async (req, res) => {
 /**
  * POST /api/subscription/reset
  * Reset user subscription back to Free plan & clean up transactions
- */
+ 
 export const resetUserSubscriptionToFree = async (req, res) => {
     const { userId } = req.body;
 
@@ -523,4 +523,4 @@ export const resetUserSubscriptionToFree = async (req, res) => {
         console.error("resetUserSubscriptionToFree error:", error);
         return res.status(500).json({ message: "Failed to reset subscription." });
     }
-};
+};*/

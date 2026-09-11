@@ -157,7 +157,7 @@ export default function SubscriptionDashboard() {
         }
     };
 
-    const handleResetSubscription = async () => {
+    /*const handleResetSubscription = async () => {
         if (!user?._id) return;
         if (!confirm("Are you sure you want to reset your subscription back to the Free plan?")) {
             return;
@@ -173,7 +173,7 @@ export default function SubscriptionDashboard() {
             console.error("Reset subscription error:", err);
             alert("Failed to reset subscription.");
         }
-    };
+    };*/
 
     const handleViewPastInvoice = (item: TransactionItem) => {
         const invoicePayload: InvoiceData = {
@@ -268,14 +268,14 @@ export default function SubscriptionDashboard() {
                                             Cancel
                                         </Button>
                                     )}
-                                    <Button
+                                    {/*<Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={handleResetSubscription}
                                         className="h-6 px-0 text-[11px] text-red-400 hover:text-red-300 hover:bg-transparent"
                                     >
                                         Reset to Free
-                                    </Button>
+                                    </Button>*/}
                                 </div>
                             </div>
                         ) : (
@@ -283,7 +283,7 @@ export default function SubscriptionDashboard() {
                                 <p className="text-xs text-zinc-400 leading-relaxed">
                                     Upgrade today to download more videos daily and stream in Full HD without ads.
                                 </p>
-                                {user?._id && (
+                                {/*user?._id && (
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -292,7 +292,7 @@ export default function SubscriptionDashboard() {
                                     >
                                         Reset Subscription Data
                                     </Button>
-                                )}
+                                )*/}
                             </div>
                         )}
                     </div>
