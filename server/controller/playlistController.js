@@ -101,29 +101,47 @@ export const getChannelPlaylists = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Group videos by category
+        // Group videos by each individual category
         const categoryMap = new Map();
         allChannelVideos.forEach((video) => {
-            const cat = video.category && video.category !== "All" ? video.category : "General";
-            if (!categoryMap.has(cat)) {
-                categoryMap.set(cat, []);
+            let catList = [];
+            if (typeof video.category === "string" && video.category.trim()) {
+                catList = video.category
+                    .split(",")
+                    .map((c) => c.trim())
+                    .filter((c) => c && c.toLowerCase() !== "all");
             }
-            categoryMap.get(cat).push(video);
+            if (catList.length === 0) {
+                catList = ["General"];
+            }
+
+            // Deduplicate categories for this video
+            const uniqueCats = Array.from(new Set(catList));
+            uniqueCats.forEach((rawCat) => {
+                const catName = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
+                if (!categoryMap.has(catName)) {
+                    categoryMap.set(catName, []);
+                }
+                categoryMap.get(catName).push(video);
+            });
         });
 
         const categoryPlaylists = [];
         categoryMap.forEach((catVideos, catName) => {
-            categoryPlaylists.push({
-                _id: `cat_${catName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
-                title: `${catName} Collection`,
-                description: `Auto-generated playlist of all ${catName} videos uploaded by this channel.`,
-                channelId,
-                category: catName,
-                isCustom: false,
-                videosCount: catVideos.length,
-                thumbnail: catVideos[0]?.thumbnailpath || "",
-                videos: catVideos,
-            });
+            // Only create playlist if there is at least 1 video for this category
+            if (Array.isArray(catVideos) && catVideos.length > 0) {
+                categoryPlaylists.push({
+                    _id: `cat_${catName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
+                    title: `${catName} Collection`,
+                    description: `Auto-generated playlist of all ${catName} videos uploaded by this channel.`,
+                    channelId,
+                    category: catName,
+                    isCustom: false,
+                    videosCount: catVideos.length,
+                    thumbnail: catVideos[0]?.thumbnailpath || "",
+                    videos: catVideos,
+                });
+            }
         });
 
         return res.status(200).json({

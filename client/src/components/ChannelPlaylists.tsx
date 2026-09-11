@@ -273,13 +273,27 @@ export default function ChannelPlaylists({
                                 onClick={() => setActivePlaylistDrawer(playlist)}
                             >
                                 {/* Playlist Thumbnail & Overlay Count Badge */}
-                                <div className="relative aspect-video bg-black/80 overflow-hidden">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={thumbnailSrc}
-                                        alt={playlist.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    />
+                                <div className="relative aspect-video bg-gradient-to-br from-indigo-950 via-zinc-900 to-black overflow-hidden flex items-center justify-center">
+                                    {thumbnailSrc && thumbnailSrc !== "/placeholder.jpg" ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={thumbnailSrc}
+                                            alt=""
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                // If thumbnail fails to load, hide broken img tag to show background gradient
+                                                (e.target as HTMLElement).style.display = "none";
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-gray-500 gap-1">
+                                            <ListVideo className="w-8 h-8 text-indigo-400/60" />
+                                            <span className="text-[10px] font-semibold text-gray-400">
+                                                {playlist.category || "Playlist"}
+                                            </span>
+                                        </div>
+                                    )}
+
                                     <div className="absolute inset-y-0 right-0 w-2/5 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center text-white gap-1 p-2">
                                         <ListVideo className="w-6 h-6" />
                                         <span className="text-xs font-bold">
@@ -288,11 +302,11 @@ export default function ChannelPlaylists({
                                     </div>
                                     <div className="absolute bottom-2 left-2">
                                         {playlist.isCustom ? (
-                                            <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs">
+                                            <span className="bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-md shadow-xs">
                                                 Custom
                                             </span>
                                         ) : (
-                                            <span className="bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs">
+                                            <span className="bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-0.5 rounded-md shadow-xs border border-white/10">
                                                 {playlist.category}
                                             </span>
                                         )}
