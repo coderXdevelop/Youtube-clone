@@ -24,8 +24,8 @@ const tabs = [
 
 const Channeltabs: React.FC<ChanneltabsProps> = ({ activeTab = "videos", onTabChange }) => {
     return (
-        <div className="border-b border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md sticky top-14 z-20 px-4 sm:px-6 md:px-8">
-            <div className="flex gap-2 sm:gap-6 overflow-x-auto no-scrollbar py-1">
+        <div className="border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 sm:px-6 md:px-8">
+            <div className="flex gap-1 sm:gap-4 overflow-x-auto no-scrollbar py-0.5">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -34,10 +34,10 @@ const Channeltabs: React.FC<ChanneltabsProps> = ({ activeTab = "videos", onTabCh
                             key={tab.id}
                             type="button"
                             onClick={() => onTabChange?.(tab.id)}
-                            className={`relative flex items-center gap-2 py-3 px-3 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer rounded-lg ${
+                            className={`relative flex items-center gap-2 py-3 px-3.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer rounded-t-lg ${
                                 isActive
                                     ? "text-gray-900 dark:text-white"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-zinc-800/50"
+                                    : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100/60 dark:hover:bg-zinc-900"
                             }`}
                         >
                             <Icon className={`w-4 h-4 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-gray-500"}`} />
@@ -45,7 +45,7 @@ const Channeltabs: React.FC<ChanneltabsProps> = ({ activeTab = "videos", onTabCh
 
                             {/* Active bottom indicator line */}
                             {isActive && (
-                                <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
+                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
                             )}
                         </button>
                     );
