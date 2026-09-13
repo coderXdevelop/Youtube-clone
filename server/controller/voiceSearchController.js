@@ -23,7 +23,7 @@ const voiceStorage = multer.diskStorage({
 export const voiceAudioUpload = multer({
     storage: voiceStorage,
     limits: {
-        fileSize: 15 * 1024 * 1024, // 15 MB limit for audio query
+        fileSize: 5 * 1024 * 1024, // 5 MB max for short voice search clips
     },
 });
 
