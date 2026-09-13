@@ -10,6 +10,29 @@ if (ffmpegPath) {
     ffmpeg.setFfmpegPath(ffmpegPath);
 }
 
+// Global cached pipeline for @xenova/transformers
+let cachedTranscriber = null;
+
+/**
+ * Lazy-load the local Whisper pipeline from @xenova/transformers
+ */
+const getTranscriber = async () => {
+    if (!cachedTranscriber) {
+        try {
+            const { pipeline } = await import("@xenova/transformers");
+            console.log("[CaptionService] 🎙️ Initializing Whisper speech-to-text pipeline (Xenova/whisper-tiny)...");
+            cachedTranscriber = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
+                quantized: true,
+            });
+            console.log("[CaptionService] ✅ Whisper pipeline ready.");
+        } catch (err) {
+            console.warn("[CaptionService] ⚠️ Could not load @xenova/transformers locally:", err.message);
+            cachedTranscriber = null;
+        }
+    }
+    return cachedTranscriber;
+};
+
 /**
  * Format seconds (e.g. 74.32) into WebVTT timestamp format (00:01:14.320)
  */
@@ -109,67 +132,136 @@ export const extractAudioForStt = (videoPath, outputWavPath) => {
 };
 
 /**
- * Transcribe audio file via cloud Groq Whisper API (zero local memory footprint)
+ * Transcribe WAV audio via Groq Whisper API if key is available
  */
-const transcribeWithGroq = async (audioFilePath, isShortVoiceQuery = false) => {
+const transcribeWithGroq = async (wavPath) => {
     const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-        console.warn("[CaptionService] ℹ️ GROQ_API_KEY is not set. Set GROQ_API_KEY in environment variables for instant cloud speech-to-text.");
-        return null;
-    }
+    if (!apiKey) return null;
 
     try {
-        console.log(`[CaptionService] 🚀 Transcribing via Groq Whisper API (${audioFilePath})...`);
-        const fileBuffer = fs.readFileSync(audioFilePath);
-        const fileName = path.basename(audioFilePath);
-        const ext = path.extname(fileName).toLowerCase();
-        const mimeType = ext === ".webm" ? "audio/webm" : ext === ".mp4" ? "audio/mp4" : "audio/wav";
+        console.log("[CaptionService] 🚀 Transcribing via Groq Whisper API (whisper-large-v3)...");
+        const fileStream = fs.createReadStream(wavPath);
+        const stats = fs.statSync(wavPath);
 
-        const fileBlob = new Blob([fileBuffer], { type: mimeType });
-        const formData = new FormData();
-        formData.append("file", fileBlob, fileName);
-        formData.append("model", "whisper-large-v3-turbo");
+        const boundary = "----WebKitFormBoundary" + Math.random().toString(36).substring(2);
+        const formDataBuffer = [];
 
-        if (isShortVoiceQuery) {
-            formData.append("response_format", "json");
-        } else {
-            formData.append("response_format", "verbose_json");
-            formData.append("timestamp_granularities[]", "segment");
-        }
+        // Build simple multipart/form-data payload without heavy extra deps
+        const fileBuffer = fs.readFileSync(wavPath);
+        const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n`;
+        const modelField = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-large-v3\r\n`;
+        const formatField = `--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\nverbose_json\r\n`;
+        const timestampField = `--${boundary}\r\nContent-Disposition: form-data; name="timestamp_granularities[]"\r\n\r\nsegment\r\n`;
+        const footer = `--${boundary}--\r\n`;
+
+        const body = Buffer.concat([
+            Buffer.from(header, "utf8"),
+            fileBuffer,
+            Buffer.from(modelField + formatField + timestampField + footer, "utf8"),
+        ]);
 
         const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${apiKey}`,
+                "Content-Type": `multipart/form-data; boundary=${boundary}`,
+                "Content-Length": String(body.length),
             },
-            body: formData,
+            body: body,
         });
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`Groq API responded with status ${response.status}: ${errText}`);
+            throw new Error(`Groq API responded with ${response.status}: ${errText}`);
         }
 
         const data = await response.json();
-        if (isShortVoiceQuery) {
-            return [{ start: 0, end: 5, text: data.text || "" }];
-        }
-
         if (data && Array.isArray(data.segments)) {
-            return data.segments
-                .map((seg) => ({
-                    start: Number(seg.start || 0),
-                    end: Number(seg.end || seg.start + 2),
-                    text: String(seg.text || "").trim(),
-                }))
-                .filter((c) => c.text.length > 0);
-        } else if (data && data.text) {
-            return [{ start: 0, end: 5, text: String(data.text).trim() }];
+            return data.segments.map((seg) => ({
+                start: Number(seg.start || 0),
+                end: Number(seg.end || seg.start + 2),
+                text: String(seg.text || "").trim(),
+            })).filter((c) => c.text.length > 0);
         }
 
         return null;
     } catch (err) {
-        console.warn("[CaptionService] ⚠️ Groq API transcription error:", err.message);
+        console.warn("[CaptionService] ⚠️ Groq API transcription failed, falling back to local STT:", err.message);
+        return null;
+    }
+};
+
+/**
+ * Transcribe WAV audio via local @xenova/transformers Whisper model
+ */
+const transcribeWithLocalWhisper = async (wavPath) => {
+    try {
+        const transcriber = await getTranscriber();
+        if (!transcriber) return null;
+
+        const wavefileModule = await import("wavefile");
+        const WaveFile = wavefileModule.default?.WaveFile || wavefileModule.WaveFile || wavefileModule.default;
+        const buffer = fs.readFileSync(wavPath);
+        const wav = new WaveFile(buffer);
+        wav.toBitDepth("32f");
+        wav.toSampleRate(16000);
+
+        let audioData = wav.getSamples(false, Float32Array);
+        if (Array.isArray(audioData)) {
+            audioData = audioData[0]; // If multi-channel, use channel 0
+        }
+        if (!(audioData instanceof Float32Array)) {
+            audioData = new Float32Array(audioData);
+        }
+
+        console.log(`[CaptionService] 🧠 Running local Whisper inference on audio samples (${audioData.length} samples)...`);
+        const output = await transcriber(audioData, {
+            chunk_length_s: 30,
+            stride_length_s: 0,
+            return_timestamps: true,
+        });
+
+        if (output && Array.isArray(output.chunks)) {
+            const cleanCues = [];
+            let lastCleanText = "";
+
+            for (const chunk of output.chunks) {
+                let text = String(chunk.text || "").trim();
+                text = text.replace(/\[(?:dramatic music|MUSIC PLAYING|MUSIC|music|sound)\]\s*/gi, "[Music] ");
+                text = text.replace(/\s+/g, " ").trim();
+                text = text.replace(/(\[Music\]\s*)+/gi, "[Music]");
+
+                if (!text) continue;
+
+                const start = Number(Array.isArray(chunk.timestamp) ? chunk.timestamp[0] : 0);
+                const end = Number(Array.isArray(chunk.timestamp) ? (chunk.timestamp[1] || start + 2) : start + 2);
+
+                if (text === "[Music]" && lastCleanText === "[Music]") {
+                    continue;
+                }
+
+                cleanCues.push({
+                    start: Math.round(start * 100) / 100,
+                    end: Math.round(end * 100) / 100,
+                    text: text,
+                });
+                lastCleanText = text;
+            }
+
+            return cleanCues.filter((c) => c.text.length > 0);
+        }
+
+        if (output && output.text) {
+            return [{
+                start: 0,
+                end: 5,
+                text: output.text.trim(),
+            }];
+        }
+
+        return null;
+    } catch (err) {
+        console.warn("[CaptionService] ⚠️ Local Whisper transcription error:", err.message);
         return null;
     }
 };
@@ -217,24 +309,22 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
         const finalVttPath = path.join(captionsDir, `${videoIdStr}_${language}.vtt`);
         const relativeVttPath = `uploads/captions/${videoIdStr}_${language}.vtt`.replace(/\\/g, "/");
 
-        let cues = null;
-        try {
-            // 1. Extract 16kHz mono audio for transcription
-            console.log(`[CaptionService] 🔊 Extracting 16kHz audio to ${tempWavPath}...`);
-            await extractAudioForStt(absoluteVideoPath, tempWavPath);
+        // 1. Extract 16kHz mono audio
+        console.log(`[CaptionService] 🔊 Extracting 16kHz audio to ${tempWavPath}...`);
+        await extractAudioForStt(absoluteVideoPath, tempWavPath);
 
-            // 2. Perform STT via Groq Cloud API
-            cues = await transcribeWithGroq(tempWavPath, false);
-        } finally {
-            // Guarantee immediate cleanup of temporary WAV file to save disk and memory
-            if (fs.existsSync(tempWavPath)) {
-                try {
-                    fs.unlinkSync(tempWavPath);
-                } catch (e) {}
-            }
+        // 2. Perform STT (Groq Cloud API if configured, otherwise local Whisper)
+        let cues = await transcribeWithGroq(tempWavPath);
+        if (!cues || cues.length === 0) {
+            cues = await transcribeWithLocalWhisper(tempWavPath);
         }
 
-        // If no speech detected, or GROQ_API_KEY not configured, provide a default friendly cue
+        // Clean up temp WAV file
+        if (fs.existsSync(tempWavPath)) {
+            fs.unlinkSync(tempWavPath);
+        }
+
+        // If no speech detected or empty audio, provide a default friendly cue
         if (!cues || cues.length === 0) {
             const vidDoc = await video.findById(videoId);
             const title = vidDoc?.videotitle || "Video Stream";
@@ -268,14 +358,28 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
 
 /**
  * Transcribe a short voice search audio clip (uploaded from browser mic)
- * Lightweight streaming directly to Groq Whisper with 0MB in-process ML memory
  */
 export const transcribeAudioQuery = async (audioFilePath) => {
+    const tempDir = path.resolve(path.join("uploads", "temp"));
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const tempWavPath = path.join(
+        tempDir,
+        `voice_query_${Date.now()}_${Math.random().toString(36).substring(2)}.wav`
+    );
+
     try {
         console.log(`[CaptionService] 🎙️ Processing voice search query from ${audioFilePath}...`);
-        
-        // Directly transcribe audio file with Groq (supports webm/wav/mp4 natively)
-        const cues = await transcribeWithGroq(audioFilePath, true);
+        // 1. Extract/convert to 16kHz mono WAV
+        await extractAudioForStt(audioFilePath, tempWavPath);
+
+        // 2. Transcribe via Groq (fast) or local Whisper
+        let cues = await transcribeWithGroq(tempWavPath);
+        if (!cues || cues.length === 0) {
+            cues = await transcribeWithLocalWhisper(tempWavPath);
+        }
 
         if (cues && cues.length > 0) {
             const fullText = cues
@@ -291,7 +395,12 @@ export const transcribeAudioQuery = async (audioFilePath) => {
     } catch (err) {
         console.error("[CaptionService] ❌ Voice search query transcription failed:", err);
         return "";
+    } finally {
+        if (fs.existsSync(tempWavPath)) {
+            try {
+                fs.unlinkSync(tempWavPath);
+            } catch (e) {}
+        }
     }
 };
-
 
