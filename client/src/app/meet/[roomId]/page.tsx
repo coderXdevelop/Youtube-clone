@@ -87,22 +87,22 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
 
     if (isLoadingDetails) {
         return (
-            <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center font-sans">
+            <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col items-center justify-center font-sans transition-colors duration-200">
                 <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-sm font-semibold text-neutral-400">Loading meeting room details...</p>
+                <p className="text-sm font-semibold text-zinc-600 dark:text-neutral-400">Loading meeting room details...</p>
             </div>
         );
     }
 
     if (fetchError) {
         return (
-            <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-4 font-sans">
-                <div className="p-6 bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md text-center flex flex-col gap-4">
-                    <h2 className="text-xl font-bold text-red-500">Meeting Room Error</h2>
-                    <p className="text-sm text-neutral-400">{fetchError}</p>
+            <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col items-center justify-center p-4 font-sans transition-colors duration-200">
+                <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-neutral-800 rounded-2xl max-w-md text-center flex flex-col gap-4 shadow-xl dark:shadow-2xl">
+                    <h2 className="text-xl font-bold text-red-600 dark:text-red-500">Meeting Room Error</h2>
+                    <p className="text-sm text-zinc-600 dark:text-neutral-400">{fetchError}</p>
                     <button
                         onClick={() => router.push("/meet")}
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl text-sm"
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl text-sm cursor-pointer shadow-md shadow-red-600/20"
                     >
                         Return to Meetings
                     </button>

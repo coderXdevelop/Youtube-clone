@@ -76,11 +76,11 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
     }, [localStream, isCameraOff]);
 
     return (
-        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-start lg:items-center justify-start lg:justify-center p-4 sm:p-6 select-none overflow-y-auto">
+        <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col items-start lg:items-center justify-start lg:justify-center p-4 sm:p-6 select-none overflow-y-auto transition-colors duration-200">
             <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 items-center py-4 lg:py-0">
                 {/* Video Preview Box */}
                 <div className="lg:col-span-7 flex flex-col items-center gap-4">
-                    <div className="relative w-full aspect-video bg-neutral-900 rounded-2xl overflow-hidden border border-neutral-800 shadow-2xl flex items-center justify-center">
+                    <div className="relative w-full aspect-video bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-200 dark:border-neutral-800 shadow-xl dark:shadow-2xl flex items-center justify-center">
                         {/* Always keep video mounted so srcObject is preserved across camera toggles */}
                         <video
                             ref={videoRef}
@@ -92,7 +92,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
 
                         {/* Avatar overlay when camera is off */}
                         {isCameraOff && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-900">
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-900">
                                 <Avatar className="h-24 w-24 border-2 border-neutral-700 shadow-lg">
                                     <AvatarImage src={user?.image} />
                                     <AvatarFallback className="bg-neutral-800 text-2xl font-bold text-neutral-300">
@@ -104,12 +104,12 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                         )}
 
                         {/* Bottom Floating Quick Toggles */}
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-neutral-950/80 backdrop-blur-md px-4 py-2 rounded-full border border-neutral-800">
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-neutral-950/80 backdrop-blur-md px-4 py-2 rounded-full border border-neutral-800 shadow-lg">
                             <Button
                                 variant={isMuted ? "destructive" : "secondary"}
                                 size="icon"
                                 onClick={() => onToggleMute()}
-                                className="rounded-full h-10 w-10 cursor-pointer"
+                                className="rounded-full h-10 w-10 cursor-pointer shadow-md"
                                 title={isMuted ? "Unmute Mic" : "Mute Mic"}
                             >
                                 {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -118,7 +118,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                                 variant={isCameraOff ? "destructive" : "secondary"}
                                 size="icon"
                                 onClick={() => onToggleCamera()}
-                                className="rounded-full h-10 w-10 cursor-pointer"
+                                className="rounded-full h-10 w-10 cursor-pointer shadow-md"
                                 title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
                             >
                                 {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
@@ -139,16 +139,16 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
 
                     {/* Media Error / Permission Guidance Alert */}
                     {mediaError && (
-                        <div className="w-full flex items-start gap-3 p-3.5 bg-amber-950/60 border border-amber-800/80 rounded-xl text-amber-200 text-xs shadow-lg">
-                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="w-full flex items-start gap-3 p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 rounded-xl text-amber-800 dark:text-amber-200 text-xs shadow-md">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                             <div className="flex-1 flex flex-col gap-1.5">
-                                <span className="font-semibold text-amber-300">Device Access Notice</span>
-                                <span className="text-[11px] leading-relaxed text-amber-200/90">{mediaError}</span>
+                                <span className="font-semibold text-amber-900 dark:text-amber-300">Device Access Notice</span>
+                                <span className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-200/90">{mediaError}</span>
                                 {onRetryMediaPermissions && (
                                     <button
                                         type="button"
                                         onClick={onRetryMediaPermissions}
-                                        className="self-start mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                                        className="self-start mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 dark:bg-amber-500/20 hover:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 dark:border-amber-500/40 rounded-lg text-[11px] font-medium transition cursor-pointer"
                                     >
                                         <RefreshCw className="w-3 h-3" />
                                         <span>Retry Camera & Mic</span>
@@ -162,11 +162,11 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                     <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         {availableVideoDevices.length > 0 && (
                             <div>
-                                <label className="block text-neutral-400 mb-1 font-semibold">Camera</label>
+                                <label className="block text-zinc-600 dark:text-neutral-400 mb-1 font-semibold">Camera</label>
                                 <select
                                     value={selectedVideoDevice}
                                     onChange={(e) => onSelectVideoDevice(e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white outline-none focus:border-red-600"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-zinc-900 dark:text-white outline-none focus:border-red-600 shadow-sm"
                                 >
                                     {availableVideoDevices.map((dev) => (
                                         <option key={dev.deviceId} value={dev.deviceId}>
@@ -179,11 +179,11 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
 
                         {availableAudioDevices.length > 0 && (
                             <div>
-                                <label className="block text-neutral-400 mb-1 font-semibold">Microphone</label>
+                                <label className="block text-zinc-600 dark:text-neutral-400 mb-1 font-semibold">Microphone</label>
                                 <select
                                     value={selectedAudioDevice}
                                     onChange={(e) => onSelectAudioDevice(e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white outline-none focus:border-red-600"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-neutral-800 rounded-xl px-3 py-2 text-zinc-900 dark:text-white outline-none focus:border-red-600 shadow-sm"
                                 >
                                     {availableAudioDevices.map((dev) => (
                                         <option key={dev.deviceId} value={dev.deviceId}>
@@ -197,25 +197,25 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                 </div>
 
                 {/* Join Form Details */}
-                <div className="lg:col-span-5 flex flex-col gap-5 bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+                <div className="lg:col-span-5 flex flex-col gap-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-neutral-800 rounded-2xl p-6 shadow-xl dark:shadow-2xl shadow-zinc-200/50 dark:shadow-black/60">
                     <div>
-                        <h2 className="text-2xl font-bold text-white tracking-tight">{meetingTitle}</h2>
-                        <p className="text-xs text-neutral-400 mt-1 font-mono">Room ID: {roomId}</p>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">{meetingTitle}</h2>
+                        <p className="text-xs text-zinc-500 dark:text-neutral-400 mt-1 font-mono">Room ID: {roomId}</p>
                     </div>
 
                     {hasPasscode && (
                         isHost ? (
-                            <div className="flex items-center gap-2.5 p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs">
-                                <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div className="flex items-center gap-2.5 p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 rounded-xl text-xs">
+                                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                                 <div>
-                                    <p className="font-semibold text-amber-200">Passcode Protected Meeting</p>
-                                    <p className="text-[11px] text-amber-400/80">You are verified as the Host. No passcode entry required.</p>
+                                    <p className="font-semibold text-amber-900 dark:text-amber-200">Passcode Protected Meeting</p>
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-400/80">You are verified as the Host. No passcode entry required.</p>
                                 </div>
                             </div>
                         ) : (
                             <div className="flex flex-col gap-2">
-                                <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
-                                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                <label className="text-xs font-semibold text-zinc-700 dark:text-neutral-300 flex items-center gap-1.5">
+                                    <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                                     Meeting Passcode Required
                                 </label>
                                 <Input
@@ -223,15 +223,15 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                                     placeholder="Enter passcode"
                                     value={passcode}
                                     onChange={(e) => setPasscode(e.target.value)}
-                                    className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm"
+                                    className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-neutral-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 rounded-xl text-sm focus:border-red-500"
                                 />
                             </div>
                         )
                     )}
 
                     {joinError && (
-                        <div className="flex items-center gap-2 p-3 bg-red-950/80 border border-red-800 text-red-300 rounded-xl text-xs">
-                            <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
+                        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 rounded-xl text-xs">
+                            <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                             <span>{joinError}</span>
                         </div>
                     )}
@@ -239,12 +239,12 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                     <div className="flex flex-col gap-3 pt-2">
                         <Button
                             onClick={() => onJoin(passcode)}
-                            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all hover:scale-[1.02]"
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 cursor-pointer transition-all hover:scale-[1.02]"
                         >
                             <Play className="w-4 h-4 fill-white" />
                             <span>Join Meeting Now</span>
                         </Button>
-                        <p className="text-[11px] text-neutral-500 text-center">
+                        <p className="text-[11px] text-zinc-500 dark:text-neutral-500 text-center">
                             By joining, you agree to meeting moderation guidelines.
                         </p>
                     </div>

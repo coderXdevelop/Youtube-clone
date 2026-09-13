@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
     Mic,
     MicOff,
@@ -26,6 +26,13 @@ import {
     AlertTriangle,
     RefreshCw,
     X,
+    Pin,
+    PinOff,
+    Maximize2,
+    Minimize2,
+    LayoutGrid,
+    Tv,
+    Presentation,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -102,12 +109,12 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     const [activeDrawer, setActiveDrawer] = useState<"participants" | "chat" | null>(null);
     const [chatInputText, setChatInputText] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
-    const [spotlightSocketId, setSpotlightSocketId] = useState<string | null>(null);
+    
+    // Layout and Pinning state
+    const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
+    const [layoutMode, setLayoutMode] = useState<"grid" | "spotlight">("grid");
+    const [isSelfFloating, setIsSelfFloating] = useState(false);
 
-    // Detect if screen sharing is available (not on mobile browsers)
-    const canScreenShare = typeof window !== "undefined" && typeof navigator?.mediaDevices?.getDisplayMedia === "function";
-
-    const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const chatEndRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -144,23 +151,6 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         return `${mins.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
     };
 
-    // Attach local stream to video element — always keep srcObject up to date
-    useEffect(() => {
-        const video = localVideoRef.current;
-        if (!video) return;
-        const nextStream = screenStream || localStream;
-        if (nextStream) {
-            if (video.srcObject !== nextStream) {
-                video.srcObject = nextStream;
-            }
-            if (!isCameraOff) {
-                video.play().catch(() => {});
-            }
-        } else {
-            video.srcObject = null;
-        }
-    }, [localStream, screenStream, isCameraOff]);
-
     // Unread messages indicator logic
     useEffect(() => {
         if (activeDrawer !== "chat" && chatMessages.length > 0) {
@@ -170,6 +160,33 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         }
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chatMessages, activeDrawer]);
+
+    // Participants list array
+    const participantList = useMemo(() => Array.from(participants.values()), [participants]);
+
+    // Auto-detect presenting participant
+    const screenShareParticipant = useMemo(() => {
+        if (isScreenSharing) return { socketId: mySocketId, name: "You (Screen)", isLocal: true };
+        const presenter = participantList.find((p) => p.isScreenSharing);
+        if (presenter) return { socketId: presenter.socketId, name: presenter.name, isLocal: false };
+        return null;
+    }, [isScreenSharing, mySocketId, participantList]);
+
+    // Auto-pin presenter if no manual pin
+    useEffect(() => {
+        if (screenShareParticipant && !pinnedSocketId) {
+            setPinnedSocketId(screenShareParticipant.socketId);
+            setLayoutMode("spotlight");
+        }
+    }, [screenShareParticipant, pinnedSocketId]);
+
+    // If pinned socket leaves room, reset pin
+    useEffect(() => {
+        if (pinnedSocketId && pinnedSocketId !== mySocketId && !participants.has(pinnedSocketId)) {
+            setPinnedSocketId(null);
+            setLayoutMode("grid");
+        }
+    }, [pinnedSocketId, participants, mySocketId]);
 
     // Copy Meeting Link
     const copyLink = () => {
@@ -213,33 +230,137 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
         }
     };
 
-    // Participants list array
-    const participantList = Array.from(participants.values());
+    // Handle pin toggle
+    const handlePinToggle = (socketId: string) => {
+        if (pinnedSocketId === socketId) {
+            setPinnedSocketId(null);
+            setLayoutMode("grid");
+        } else {
+            setPinnedSocketId(socketId);
+            setLayoutMode("spotlight");
+        }
+    };
+
+    // Determine current pinned participant object
+    const pinnedParticipant = useMemo(() => {
+        if (!pinnedSocketId) return null;
+        if (pinnedSocketId === mySocketId) {
+            return {
+                isLocal: true,
+                socketId: mySocketId,
+                name: user?.name || "You",
+                avatar: user?.image,
+                isMuted,
+                isCameraOff,
+                isHandRaised,
+                isScreenSharing,
+                isHost,
+                isCoHost,
+            };
+        }
+        const found = participants.get(pinnedSocketId);
+        if (found) {
+            return {
+                ...found,
+                isLocal: false,
+            };
+        }
+        return null;
+    }, [pinnedSocketId, mySocketId, user, isMuted, isCameraOff, isHandRaised, isScreenSharing, isHost, isCoHost, participants]);
+
+    // Active spotlight mode check
+    const isSpotlightActive = layoutMode === "spotlight" && pinnedSocketId !== null && pinnedParticipant !== null;
+
+    // Calculate grid classes based on visible tiles count
+    const totalGridTiles = participantList.length + (isSelfFloating ? 0 : 1);
+
+    const getGridClasses = () => {
+        if (totalGridTiles <= 1) {
+            return "grid-cols-1 max-w-4xl";
+        }
+        if (totalGridTiles === 2) {
+            return "grid-cols-1 md:grid-cols-2 max-w-6xl";
+        }
+        if (totalGridTiles <= 4) {
+            return "grid-cols-1 sm:grid-cols-2 max-w-6xl";
+        }
+        if (totalGridTiles <= 6) {
+            return "grid-cols-2 sm:grid-cols-3 max-w-7xl";
+        }
+        if (totalGridTiles <= 9) {
+            return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 max-w-7xl";
+        }
+        return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 max-w-7xl";
+    };
 
     return (
         <div className="h-screen w-screen bg-neutral-950 text-white flex flex-col overflow-hidden select-none relative font-sans">
             {/* Top Navigation Header */}
-            <header className="h-14 bg-neutral-900/90 border-b border-neutral-800 px-4 flex items-center justify-between shrink-0 z-30">
-                <div className="flex items-center gap-3">
-                    <div className="bg-red-600 p-1.5 rounded-lg flex items-center justify-center">
+            <header className="h-14 bg-neutral-900/95 border-b border-neutral-800/80 px-3 sm:px-4 flex items-center justify-between shrink-0 z-30 backdrop-blur-md">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="bg-red-600 p-1.5 rounded-xl flex items-center justify-center shadow-md shadow-red-600/20 shrink-0">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
                             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                         </svg>
                     </div>
-                    <div>
-                        <h1 className="text-sm sm:text-base font-bold truncate max-w-[180px] sm:max-w-xs">{meetingTitle}</h1>
-                        <p className="text-[11px] text-neutral-400 font-mono hidden sm:block">Room: {roomId}</p>
+                    <div className="min-w-0">
+                        <h1 className="text-xs sm:text-sm font-bold truncate max-w-[140px] sm:max-w-xs">{meetingTitle}</h1>
+                        <p className="text-[10px] text-neutral-400 font-mono hidden sm:block">Room: {roomId}</p>
                     </div>
                     {roomSettings.isLocked && (
-                        <span className="flex items-center gap-1 text-[11px] bg-amber-950 text-amber-300 border border-amber-800 px-2 py-0.5 rounded-md font-semibold">
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] bg-amber-950/80 text-amber-300 border border-amber-800/80 px-2 py-0.5 rounded-md font-semibold shrink-0">
                             <Lock className="w-3 h-3" /> Locked
                         </span>
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Center / Right controls */}
+                <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                    {/* Layout Switcher (Grid vs Spotlight/Stage) */}
+                    <div className="flex items-center bg-neutral-800/80 p-0.5 rounded-lg border border-neutral-700/60">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setLayoutMode("grid");
+                                setPinnedSocketId(null);
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                                !isSpotlightActive
+                                    ? "bg-neutral-700 text-white shadow-sm"
+                                    : "text-neutral-400 hover:text-neutral-200"
+                            }`}
+                            title="Grid View (All participants)"
+                        >
+                            <LayoutGrid className="w-3.5 h-3.5" />
+                            <span className="hidden md:inline">Grid</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isSpotlightActive) {
+                                    setLayoutMode("grid");
+                                    setPinnedSocketId(null);
+                                } else {
+                                    // Pin first remote participant or self
+                                    const targetId = participantList[0]?.socketId || mySocketId;
+                                    setPinnedSocketId(targetId);
+                                    setLayoutMode("spotlight");
+                                }
+                            }}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition cursor-pointer ${
+                                isSpotlightActive
+                                    ? "bg-red-600 text-white shadow-sm shadow-red-600/30"
+                                    : "text-neutral-400 hover:text-neutral-200"
+                            }`}
+                            title={isSpotlightActive ? "Unpin Focus" : "Spotlight / Pin Stage View"}
+                        >
+                            {isSpotlightActive ? <PinOff className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5" />}
+                            <span className="hidden md:inline">{isSpotlightActive ? "Pinned" : "Stage"}</span>
+                        </button>
+                    </div>
+
                     {/* Connection Quality */}
-                    <div className="hidden sm:flex items-center gap-1.5 text-xs text-neutral-400 bg-neutral-800/60 px-3 py-1 rounded-full border border-neutral-700">
+                    <div className="hidden md:flex items-center gap-1.5 text-xs text-neutral-400 bg-neutral-800/60 px-2.5 py-1 rounded-full border border-neutral-700/60">
                         <span
                             className={`w-2 h-2 rounded-full ${
                                 connectionQuality === "Good"
@@ -249,11 +370,11 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                     : "bg-red-500"
                             }`}
                         />
-                        <span>{connectionQuality} Connection</span>
+                        <span className="hidden lg:inline">{connectionQuality}</span>
                     </div>
 
                     {/* Timer */}
-                    <div className="text-xs font-mono bg-neutral-800 px-3 py-1 rounded-full font-semibold text-neutral-200">
+                    <div className="text-xs font-mono bg-neutral-800/90 px-2.5 py-1 rounded-full font-semibold text-neutral-200 border border-neutral-700/40">
                         {formatTime(durationSeconds)}
                     </div>
 
@@ -262,10 +383,10 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         variant="secondary"
                         size="sm"
                         onClick={copyLink}
-                        className="h-8 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer"
+                        className="h-8 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center gap-1.5 cursor-pointer border border-neutral-700/50"
                     >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">{copied ? "Copied" : "Invite Link"}</span>
+                        <span className="hidden sm:inline">{copied ? "Copied" : "Invite"}</span>
                     </Button>
                 </div>
             </header>
@@ -300,79 +421,165 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                 </div>
             )}
 
-            {/* Main Center Video Layout */}
+            {/* Main Stage & Layout Area */}
             <div className="flex-1 flex overflow-hidden relative">
-                <div className="flex-1 p-3 sm:p-4 overflow-y-auto flex items-center justify-center">
-                    {/* Grid of Videos */}
-                    <div
-                        className={`w-full h-full grid gap-3 max-w-7xl mx-auto items-center justify-center ${
-                            spotlightSocketId
-                                ? "grid-cols-1"
-                                : participantList.length === 0
-                                ? "grid-cols-1"
-                                : participantList.length === 1
-                                ? "grid-cols-1 md:grid-cols-2"
-                                : participantList.length <= 3
-                                ? "grid-cols-1 md:grid-cols-2"
-                                : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                        }`}
-                    >
-                        {/* Local Video Tile */}
-                        <div
-                            onClick={() => setSpotlightSocketId(spotlightSocketId === mySocketId ? null : mySocketId)}
-                            className={`relative aspect-video w-full max-h-[75vh] bg-neutral-900 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer group ${
-                                speakingSockets.has(mySocketId) ? "border-emerald-500 shadow-lg shadow-emerald-500/20" : "border-neutral-800"
-                            }`}
-                        >
-                            {/* Always keep video element mounted to preserve srcObject across camera toggles */}
-                            <video
-                                ref={localVideoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className={`w-full h-full object-cover ${isScreenSharing || facingMode === "environment" ? "" : "-scale-x-100"} ${
-                                    isCameraOff ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"
-                                }`}
-                            />
+                <main className="flex-1 p-2 sm:p-4 overflow-hidden flex flex-col items-center justify-center min-h-0 relative">
+                    
+                    {/* MODE 1: SPOTLIGHT / PINNED STAGE VIEW */}
+                    {isSpotlightActive ? (
+                        <div className="w-full h-full flex flex-col sm:flex-row gap-3 min-h-0 items-stretch justify-center max-w-[1600px] mx-auto">
+                            {/* Main Stage (Large Video Tile) */}
+                            <div className="flex-1 min-h-0 min-w-0 flex items-center justify-center relative bg-neutral-950/60 rounded-2xl overflow-hidden p-1">
+                                {pinnedParticipant.isLocal ? (
+                                    <LocalVideoTile
+                                        user={user}
+                                        localStream={localStream}
+                                        screenStream={screenStream}
+                                        isMuted={isMuted}
+                                        isCameraOff={isCameraOff}
+                                        isScreenSharing={isScreenSharing}
+                                        isHandRaised={isHandRaised}
+                                        isSpeaking={speakingSockets.has(mySocketId)}
+                                        isPinned={true}
+                                        onPinToggle={() => handlePinToggle(mySocketId)}
+                                        facingMode={facingMode}
+                                        isHost={isHost}
+                                        isCoHost={isCoHost}
+                                        isStage={true}
+                                    />
+                                ) : (
+                                    <RemoteVideoTile
+                                        participant={participants.get(pinnedSocketId)!}
+                                        isSpeaking={speakingSockets.has(pinnedSocketId)}
+                                        isPinned={true}
+                                        onPinToggle={() => handlePinToggle(pinnedSocketId)}
+                                        isStage={true}
+                                    />
+                                )}
 
-                            {/* Shown only when camera is off */}
-                            {isCameraOff && (
-                                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-neutral-900">
-                                    <Avatar className="h-16 w-16 border-2 border-neutral-700">
-                                        <AvatarImage src={user?.image} />
-                                        <AvatarFallback className="bg-neutral-800 text-xl font-bold text-neutral-300">
-                                            {user?.name?.[0] || "U"}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-xs font-semibold text-neutral-400">You (Camera Off)</span>
+                                {/* Pinned Indicator Overlay Pill on Stage */}
+                                <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-neutral-950/80 backdrop-blur-md border border-neutral-700/80 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">
+                                    <Pin className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                                    <span className="text-neutral-200">
+                                        Pinned: <strong className="text-white">{pinnedParticipant.name}</strong>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPinnedSocketId(null);
+                                            setLayoutMode("grid");
+                                        }}
+                                        className="ml-1 text-neutral-400 hover:text-white p-0.5 rounded transition cursor-pointer"
+                                        title="Unpin"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Name Badge */}
-                            <div className="absolute bottom-2 left-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 border border-neutral-800">
-                                <span>You ({user?.name || "Host"})</span>
-                                {isMuted && <MicOff className="w-3.5 h-3.5 text-red-500" />}
-                                {isHandRaised && <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
+                            {/* Filmstrip (Sidebar on desktop, bottom strip on mobile) */}
+                            <div className="w-full sm:w-60 md:w-72 lg:w-80 shrink-0 flex sm:flex-col gap-2.5 overflow-x-auto sm:overflow-y-auto p-1 max-h-40 sm:max-h-full scrollbar-thin scrollbar-thumb-neutral-800 scrollbar-track-transparent">
+                                {/* Local user tile if not pinned and not floating */}
+                                {!pinnedParticipant.isLocal && !isSelfFloating && (
+                                    <div className="w-48 sm:w-full aspect-video shrink-0">
+                                        <LocalVideoTile
+                                            user={user}
+                                            localStream={localStream}
+                                            screenStream={screenStream}
+                                            isMuted={isMuted}
+                                            isCameraOff={isCameraOff}
+                                            isScreenSharing={isScreenSharing}
+                                            isHandRaised={isHandRaised}
+                                            isSpeaking={speakingSockets.has(mySocketId)}
+                                            isPinned={false}
+                                            onPinToggle={() => handlePinToggle(mySocketId)}
+                                            facingMode={facingMode}
+                                            isHost={isHost}
+                                            isCoHost={isCoHost}
+                                            isFilmstrip={true}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Other participants in filmstrip */}
+                                {participantList
+                                    .filter((p) => p.socketId !== pinnedSocketId)
+                                    .map((p) => (
+                                        <div key={p.socketId} className="w-48 sm:w-full aspect-video shrink-0">
+                                            <RemoteVideoTile
+                                                participant={p}
+                                                isSpeaking={speakingSockets.has(p.socketId)}
+                                                isPinned={false}
+                                                onPinToggle={() => handlePinToggle(p.socketId)}
+                                                isFilmstrip={true}
+                                            />
+                                        </div>
+                                    ))}
                             </div>
                         </div>
+                    ) : (
+                        /* MODE 2: DYNAMIC GRID VIEW (Google Meet & Teams Style) */
+                        <div className="w-full h-full overflow-y-auto flex items-center justify-center p-1">
+                            <div
+                                className={`w-full h-full grid gap-2.5 sm:gap-4 items-center justify-center mx-auto auto-rows-fr ${getGridClasses()}`}
+                            >
+                                {/* Local User Tile (if not floating PiP) */}
+                                {!isSelfFloating && (
+                                    <LocalVideoTile
+                                        user={user}
+                                        localStream={localStream}
+                                        screenStream={screenStream}
+                                        isMuted={isMuted}
+                                        isCameraOff={isCameraOff}
+                                        isScreenSharing={isScreenSharing}
+                                        isHandRaised={isHandRaised}
+                                        isSpeaking={speakingSockets.has(mySocketId)}
+                                        isPinned={false}
+                                        onPinToggle={() => handlePinToggle(mySocketId)}
+                                        facingMode={facingMode}
+                                        isHost={isHost}
+                                        isCoHost={isCoHost}
+                                        onToggleFloat={() => setIsSelfFloating(true)}
+                                    />
+                                )}
 
-                        {/* Remote Participants Video Tiles */}
-                        {participantList.map((p) => {
-                            const isSpeaking = speakingSockets.has(p.socketId);
-                            return (
-                                <RemoteVideoTile
-                                    key={p.socketId}
-                                    participant={p}
-                                    isSpeaking={isSpeaking}
-                                    isSpotlight={spotlightSocketId === p.socketId}
-                                    onSpotlightToggle={() =>
-                                        setSpotlightSocketId(spotlightSocketId === p.socketId ? null : p.socketId)
-                                    }
-                                />
-                            );
-                        })}
-                    </div>
-                </div>
+                                {/* Remote Participant Tiles */}
+                                {participantList.map((p) => (
+                                    <RemoteVideoTile
+                                        key={p.socketId}
+                                        participant={p}
+                                        isSpeaking={speakingSockets.has(p.socketId)}
+                                        isPinned={false}
+                                        onPinToggle={() => handlePinToggle(p.socketId)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Floating Picture-in-Picture Self View (When self is popped out) */}
+                    {isSelfFloating && (
+                        <div className="fixed sm:absolute bottom-20 right-4 w-44 sm:w-60 aspect-video z-20 shadow-2xl rounded-2xl overflow-hidden border-2 border-neutral-700/80 bg-neutral-900 group">
+                            <LocalVideoTile
+                                user={user}
+                                localStream={localStream}
+                                screenStream={screenStream}
+                                isMuted={isMuted}
+                                isCameraOff={isCameraOff}
+                                isScreenSharing={isScreenSharing}
+                                isHandRaised={isHandRaised}
+                                isSpeaking={speakingSockets.has(mySocketId)}
+                                isPinned={false}
+                                onPinToggle={() => handlePinToggle(mySocketId)}
+                                facingMode={facingMode}
+                                isHost={isHost}
+                                isCoHost={isCoHost}
+                                isFloating={true}
+                                onToggleFloat={() => setIsSelfFloating(false)}
+                            />
+                        </div>
+                    )}
+                </main>
 
                 {/* Right Drawer: Participants or Chat — overlays on mobile, sidebar on desktop */}
                 {activeDrawer && (
@@ -419,7 +626,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                                             : "mute-all"
                                                     )
                                                 }
-                                                className="h-8 border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300"
+                                                className="h-8 border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-[11px]"
                                             >
                                                 {roomSettings.allowedAudio === false ? "Allow Unmute (All)" : "Mute All"}
                                             </Button>
@@ -427,7 +634,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => onSendHostControl("toggle-lock")}
-                                                className="h-8 border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300"
+                                                className="h-8 border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-[11px]"
                                             >
                                                 {roomSettings.isLocked ? "Unlock Meeting" : "Lock Meeting"}
                                             </Button>
@@ -437,7 +644,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                                 onClick={() => onSendHostControl("toggle-screenshare-permission")}
                                                 className="h-8 border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-[11px]"
                                             >
-                                                {roomSettings.allowedScreenShare ? "Disable Screen Share" : "Enable Screen Share"}
+                                                {roomSettings.allowedScreenShare ? "Disable Share" : "Enable Share"}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -451,7 +658,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                     </div>
                                 )}
 
-                                {/* You Tile */}
+                                {/* You Tile in Drawer */}
                                 <div className="flex items-center justify-between p-2.5 bg-neutral-950 border border-neutral-800 rounded-xl">
                                     <div className="flex items-center gap-2.5">
                                         <Avatar className="h-8 w-8">
@@ -466,31 +673,51 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 text-neutral-400">
+                                        <button
+                                            type="button"
+                                            onClick={() => handlePinToggle(mySocketId)}
+                                            className={`p-1.5 rounded-lg hover:bg-neutral-800 transition ${
+                                                pinnedSocketId === mySocketId ? "text-red-500" : "text-neutral-400"
+                                            }`}
+                                            title={pinnedSocketId === mySocketId ? "Unpin" : "Pin"}
+                                        >
+                                            <Pin className="w-3.5 h-3.5" />
+                                        </button>
                                         {isMuted ? <MicOff className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4 text-emerald-400" />}
                                         {isCameraOff ? <VideoOff className="w-4 h-4 text-red-500" /> : <Video className="w-4 h-4 text-emerald-400" />}
                                     </div>
                                 </div>
 
-                                {/* Remote Participants List */}
+                                {/* Remote Participants in Drawer */}
                                 {participantList.map((p) => (
                                     <div
                                         key={p.socketId}
                                         className="flex items-center justify-between p-2.5 bg-neutral-950/60 border border-neutral-800 rounded-xl"
                                     >
-                                        <div className="flex items-center gap-2.5">
-                                            <Avatar className="h-8 w-8">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <Avatar className="h-8 w-8 shrink-0">
                                                 <AvatarImage src={p.avatar} />
                                                 <AvatarFallback>{p.name?.[0] || "P"}</AvatarFallback>
                                             </Avatar>
-                                            <div>
-                                                <p className="text-xs font-bold text-white">{p.name}</p>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold text-white truncate">{p.name}</p>
                                                 <span className="text-[10px] text-neutral-400 font-medium">
                                                     {p.isHost ? "Host" : p.isCoHost ? "Co-Host" : "Participant"}
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePinToggle(p.socketId)}
+                                                className={`p-1.5 rounded-lg hover:bg-neutral-800 transition ${
+                                                    pinnedSocketId === p.socketId ? "text-red-500" : "text-neutral-400"
+                                                }`}
+                                                title={pinnedSocketId === p.socketId ? "Unpin" : "Pin to stage"}
+                                            >
+                                                <Pin className="w-3.5 h-3.5" />
+                                            </button>
                                             {p.isHandRaised && <Hand className="w-4 h-4 text-amber-400 fill-amber-400" />}
                                             {p.isMuted ? <MicOff className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4 text-emerald-400" />}
 
@@ -643,7 +870,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
             </div>
 
             {/* Bottom Controls Toolbar — 2 rows on mobile, 1 row on sm+ */}
-            <footer className="bg-neutral-900 border-t border-neutral-800 shrink-0 z-30 px-2 sm:px-4">
+            <footer className="bg-neutral-900/95 border-t border-neutral-800/80 shrink-0 z-30 px-2 sm:px-4 backdrop-blur-md">
                 {/* Mobile: Row 1 — primary call controls */}
                 <div className="flex sm:hidden items-center justify-between py-2 gap-1">
                     {/* Left: Record */}
@@ -675,7 +902,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant={isMuted ? "destructive" : "secondary"}
                             size="icon"
                             onClick={() => onToggleMute()}
-                            className="rounded-full h-10 w-10 cursor-pointer"
+                            className="rounded-full h-10 w-10 cursor-pointer shadow-md"
                             title={isMuted ? "Unmute" : "Mute"}
                         >
                             {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -684,7 +911,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant={isCameraOff ? "destructive" : "secondary"}
                             size="icon"
                             onClick={() => onToggleCamera()}
-                            className="rounded-full h-10 w-10 cursor-pointer"
+                            className="rounded-full h-10 w-10 cursor-pointer shadow-md"
                             title={isCameraOff ? "Camera On" : "Camera Off"}
                         >
                             {isCameraOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
@@ -719,7 +946,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant="destructive"
                             size="icon"
                             onClick={() => onSendHostControl("end-call")}
-                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer shadow-lg shadow-red-600/30"
                             title="End for All"
                         >
                             <PhoneOff className="w-4 h-4" />
@@ -729,7 +956,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant="destructive"
                             size="icon"
                             onClick={onLeaveCall}
-                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                            className="h-10 w-10 rounded-full bg-red-600 hover:bg-red-700 text-white cursor-pointer shadow-lg shadow-red-600/30"
                             title="Leave"
                         >
                             <PhoneOff className="w-4 h-4" />
@@ -780,9 +1007,9 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                     </Button>
                 </div>
 
-                {/* Desktop / Tablet: original single-row layout */}
+                {/* Desktop / Tablet: single-row layout */}
                 <div className="hidden sm:flex h-16 items-center justify-between">
-                    {/* Left: Record */}
+                    {/* Left: Record & Mode Info */}
                     <div className="flex items-center gap-2">
                         {isRecording ? (
                             <div className="flex items-center gap-1.5 bg-red-950/80 border border-red-800 text-red-300 px-3 py-1.5 rounded-full text-xs font-semibold animate-pulse">
@@ -797,25 +1024,43 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => startRecording()}
-                                className="h-9 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer"
+                                className="h-9 text-xs bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl flex items-center gap-1.5 cursor-pointer border border-neutral-700/50"
                                 title="Start Call Recording"
                             >
                                 <Circle className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                                <span>Record Call</span>
+                                <span>Record</span>
                             </Button>
                         )}
                     </div>
 
-                    {/* Center: all controls */}
+                    {/* Center: all primary call controls */}
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <Button variant={isMuted ? "destructive" : "secondary"} size="icon" onClick={() => onToggleMute()} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isMuted ? "Unmute Mic" : "Mute Mic"}>
+                        <Button
+                            variant={isMuted ? "destructive" : "secondary"}
+                            size="icon"
+                            onClick={() => onToggleMute()}
+                            className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 shadow-md"
+                            title={isMuted ? "Unmute Mic" : "Mute Mic"}
+                        >
                             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                         </Button>
-                        <Button variant={isCameraOff ? "destructive" : "secondary"} size="icon" onClick={() => onToggleCamera()} className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105" title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}>
+                        <Button
+                            variant={isCameraOff ? "destructive" : "secondary"}
+                            size="icon"
+                            onClick={() => onToggleCamera()}
+                            className="rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 shadow-md"
+                            title={isCameraOff ? "Turn Camera On" : "Turn Camera Off"}
+                        >
                             {isCameraOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
                         </Button>
                         {isMobile && (
-                            <Button variant="secondary" size="icon" onClick={() => onSwitchCamera()} className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105" title="Switch Front/Rear Camera">
+                            <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => onSwitchCamera()}
+                                className="rounded-full h-11 w-11 bg-neutral-800 hover:bg-neutral-700 text-white cursor-pointer transition-transform hover:scale-105"
+                                title="Switch Front/Rear Camera"
+                            >
                                 <SwitchCamera className="w-5 h-5" />
                             </Button>
                         )}
@@ -824,7 +1069,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             size="icon"
                             onClick={() => onToggleScreenShare()}
                             className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
-                                isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                                isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700/50"
                             }`}
                             title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
                         >
@@ -835,7 +1080,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             size="icon"
                             onClick={() => onToggleRaiseHand()}
                             className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
-                                isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-neutral-800 hover:bg-neutral-700 text-white"
+                                isHandRaised ? "bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-600/20" : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700/50"
                             }`}
                             title={isHandRaised ? "Lower Hand" : "Raise Hand"}
                         >
@@ -843,13 +1088,23 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         </Button>
                         {isHost ? (
                             <div className="flex items-center gap-1.5 ml-1">
-                                <Button variant="destructive" size="icon" onClick={() => onSendHostControl("end-call")} className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer">
+                                <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => onSendHostControl("end-call")}
+                                    className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 cursor-pointer"
+                                >
                                     <PhoneOff className="w-4 h-4" />
-                                    <span className="hidden sm:inline ml-1.5">End for All</span>
+                                    <span className="hidden sm:inline ml-1.5">End Call</span>
                                 </Button>
                             </div>
                         ) : (
-                            <Button variant="destructive" size="icon" onClick={onLeaveCall} className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg cursor-pointer ml-1">
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={onLeaveCall}
+                                className="h-10 w-10 sm:w-auto sm:px-4 rounded-full font-bold text-xs bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 cursor-pointer ml-1"
+                            >
                                 <PhoneOff className="w-4 h-4" />
                                 <span className="hidden sm:inline ml-1.5">Leave</span>
                             </Button>
@@ -862,7 +1117,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant={activeDrawer === "participants" ? "default" : "ghost"}
                             size="icon"
                             onClick={() => setActiveDrawer(activeDrawer === "participants" ? null : "participants")}
-                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative"
+                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative border border-transparent hover:border-neutral-700"
                             title="Participants"
                         >
                             <Users className="w-5 h-5" />
@@ -874,7 +1129,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                             variant={activeDrawer === "chat" ? "default" : "ghost"}
                             size="icon"
                             onClick={() => setActiveDrawer(activeDrawer === "chat" ? null : "chat")}
-                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative"
+                            className="rounded-full h-10 w-10 text-neutral-300 hover:text-white hover:bg-neutral-800 cursor-pointer relative border border-transparent hover:border-neutral-700"
                             title="In-Call Chat"
                         >
                             <MessageSquare className="w-5 h-5" />
@@ -887,7 +1142,8 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                     </div>
                 </div>
             </footer>
-            {/* Global Dedicated Audio Sinks for all remote participants (always mounted, never interrupted by video grid/spotlight) */}
+
+            {/* Global Dedicated Audio Sinks for all remote participants */}
             <div className="sr-only" aria-hidden="true">
                 {participantList.map((p) => (
                     <ParticipantAudio key={`audio-${p.socketId}`} participant={p} />
@@ -897,7 +1153,337 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     );
 };
 
-// Dedicated background audio sink component for each remote participant
+// ==========================================
+// Sub-components: Local & Remote Video Tiles
+// ==========================================
+
+interface LocalVideoTileProps {
+    user: any;
+    localStream: MediaStream | null;
+    screenStream: MediaStream | null;
+    isMuted: boolean;
+    isCameraOff: boolean;
+    isScreenSharing: boolean;
+    isHandRaised: boolean;
+    isSpeaking: boolean;
+    isPinned: boolean;
+    onPinToggle: () => void;
+    facingMode?: "user" | "environment";
+    isHost?: boolean;
+    isCoHost?: boolean;
+    isStage?: boolean;
+    isFilmstrip?: boolean;
+    isFloating?: boolean;
+    onToggleFloat?: () => void;
+}
+
+const LocalVideoTile: React.FC<LocalVideoTileProps> = ({
+    user,
+    localStream,
+    screenStream,
+    isMuted,
+    isCameraOff,
+    isScreenSharing,
+    isHandRaised,
+    isSpeaking,
+    isPinned,
+    onPinToggle,
+    facingMode = "user",
+    isHost,
+    isCoHost,
+    isStage = false,
+    isFilmstrip = false,
+    isFloating = false,
+    onToggleFloat,
+}) => {
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const nextStream = screenStream || localStream;
+        if (nextStream) {
+            if (video.srcObject !== nextStream) {
+                video.srcObject = nextStream;
+            }
+            if (!isCameraOff) {
+                video.play().catch(() => {});
+            }
+        } else {
+            video.srcObject = null;
+        }
+    }, [localStream, screenStream, isCameraOff]);
+
+    const handleToggleFullscreen = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!containerRef.current) return;
+        if (!document.fullscreenElement) {
+            containerRef.current.requestFullscreen?.().catch(() => {});
+        } else {
+            document.exitFullscreen?.().catch(() => {});
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            className={`relative w-full h-full bg-neutral-900 rounded-2xl overflow-hidden border-2 transition-all duration-200 group flex items-center justify-center ${
+                isStage ? "max-h-[82vh] aspect-video" : isFilmstrip ? "aspect-video" : "aspect-video max-h-[82vh]"
+            } ${
+                isSpeaking
+                    ? "border-emerald-500 shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-500/50"
+                    : isPinned
+                    ? "border-red-500/80 shadow-md shadow-red-500/20"
+                    : "border-neutral-800/90 hover:border-neutral-700"
+            }`}
+        >
+            {/* Local Video Stream */}
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full ${isScreenSharing ? "object-contain bg-black" : "object-cover"} ${
+                    isScreenSharing || facingMode === "environment" ? "" : "-scale-x-100"
+                } ${isCameraOff ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"}`}
+            />
+
+            {/* Camera Off Avatar Overlay */}
+            {isCameraOff && (
+                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-900 to-neutral-950">
+                    <div className="relative">
+                        <Avatar className={`${isFilmstrip || isFloating ? "h-10 w-10" : "h-16 w-16 sm:h-20 sm:w-20"} border-2 border-neutral-700 shadow-xl`}>
+                            <AvatarImage src={user?.image} />
+                            <AvatarFallback className="bg-neutral-800 text-lg sm:text-2xl font-bold text-neutral-300">
+                                {user?.name?.[0] || "U"}
+                            </AvatarFallback>
+                        </Avatar>
+                        {isSpeaking && (
+                            <span className="absolute -inset-1 rounded-full border-2 border-emerald-500 animate-ping opacity-60" />
+                        )}
+                    </div>
+                    {!isFilmstrip && !isFloating && (
+                        <span className="text-xs font-semibold text-neutral-400">You (Camera Off)</span>
+                    )}
+                </div>
+            )}
+
+            {/* Hover Action Overlay Toolbar */}
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 bg-neutral-950/70 backdrop-blur-md p-1 rounded-xl border border-neutral-800">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPinToggle();
+                    }}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                        isPinned ? "bg-red-600 text-white" : "text-neutral-300 hover:text-white hover:bg-neutral-800"
+                    }`}
+                    title={isPinned ? "Unpin screen" : "Pin screen"}
+                >
+                    {isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                </button>
+
+                {onToggleFloat && !isFilmstrip && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFloat();
+                        }}
+                        className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                        title={isFloating ? "Embed in grid" : "Float PiP"}
+                    >
+                        {isFloating ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    onClick={handleToggleFullscreen}
+                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                    title="Fullscreen"
+                >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Bottom Status / Name Badge */}
+            <div className="absolute bottom-2 left-2 bg-neutral-950/85 backdrop-blur-md px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-2 border border-neutral-800/80 shadow-md z-10 max-w-[85%]">
+                <span className="truncate text-white">
+                    {user?.name || "You"} {isHost ? "(Host)" : isCoHost ? "(Co-Host)" : "(You)"}
+                </span>
+
+                {/* Speaking audio wave indicator */}
+                {isSpeaking && !isMuted ? (
+                    <div className="flex items-end gap-0.5 h-3" title="Speaking">
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_100ms] h-full" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_300ms] h-2" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_200ms] h-2.5" />
+                    </div>
+                ) : isMuted ? (
+                    <MicOff className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                ) : (
+                    <Mic className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                )}
+
+                {isHandRaised && <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0 animate-bounce" />}
+                {isScreenSharing && <Presentation className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+            </div>
+        </div>
+    );
+};
+
+interface RemoteVideoTileProps {
+    participant: Participant;
+    isSpeaking: boolean;
+    isPinned: boolean;
+    onPinToggle: () => void;
+    isStage?: boolean;
+    isFilmstrip?: boolean;
+}
+
+const RemoteVideoTile: React.FC<RemoteVideoTileProps> = ({
+    participant,
+    isSpeaking,
+    isPinned,
+    onPinToggle,
+    isStage = false,
+    isFilmstrip = false,
+}) => {
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (participant.stream) {
+            const video = videoRef.current;
+            if (video) {
+                if (video.srcObject !== participant.stream) {
+                    video.srcObject = participant.stream;
+                }
+                if (!participant.isCameraOff) {
+                    video.play().catch((e) => {
+                        console.debug("Remote video play caught:", e);
+                    });
+                }
+            }
+        }
+    }, [participant.stream, participant.isCameraOff]);
+
+    const showAvatar = participant.isCameraOff || !participant.stream;
+
+    const handleToggleFullscreen = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!containerRef.current) return;
+        if (!document.fullscreenElement) {
+            containerRef.current.requestFullscreen?.().catch(() => {});
+        } else {
+            document.exitFullscreen?.().catch(() => {});
+        }
+    };
+
+    return (
+        <div
+            ref={containerRef}
+            onClick={onPinToggle}
+            className={`relative w-full h-full bg-neutral-900 rounded-2xl overflow-hidden border-2 transition-all duration-200 cursor-pointer group flex items-center justify-center ${
+                isStage ? "max-h-[82vh] aspect-video" : isFilmstrip ? "aspect-video" : "aspect-video max-h-[82vh]"
+            } ${
+                isSpeaking
+                    ? "border-emerald-500 shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-500/50"
+                    : isPinned
+                    ? "border-red-500/80 shadow-md shadow-red-500/20"
+                    : "border-neutral-800/90 hover:border-neutral-700"
+            }`}
+        >
+            {/* Video Frame */}
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full ${participant.isScreenSharing ? "object-contain bg-black" : "object-cover"} ${
+                    showAvatar ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"
+                }`}
+            />
+
+            {/* Avatar overlay for Camera Off */}
+            {showAvatar && (
+                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-neutral-900 to-neutral-950">
+                    <div className="relative">
+                        <Avatar className={`${isFilmstrip ? "h-10 w-10" : "h-16 w-16 sm:h-20 sm:w-20"} border-2 border-neutral-700 shadow-xl`}>
+                            <AvatarImage src={participant.avatar} />
+                            <AvatarFallback className="bg-neutral-800 text-lg sm:text-2xl font-bold text-neutral-300">
+                                {participant.name?.[0] || "P"}
+                            </AvatarFallback>
+                        </Avatar>
+                        {isSpeaking && (
+                            <span className="absolute -inset-1 rounded-full border-2 border-emerald-500 animate-ping opacity-60" />
+                        )}
+                    </div>
+                    {!isFilmstrip && (
+                        <span className="text-xs font-semibold text-neutral-400">
+                            {participant.name} {participant.isCameraOff ? "(Camera Off)" : ""}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Hover Action Overlay Toolbar */}
+            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 bg-neutral-950/70 backdrop-blur-md p-1 rounded-xl border border-neutral-800">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onPinToggle();
+                    }}
+                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                        isPinned ? "bg-red-600 text-white" : "text-neutral-300 hover:text-white hover:bg-neutral-800"
+                    }`}
+                    title={isPinned ? "Unpin screen" : "Pin screen to stage"}
+                >
+                    {isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                    type="button"
+                    onClick={handleToggleFullscreen}
+                    className="p-1.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
+                    title="Fullscreen"
+                >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Bottom Status / Name Badge */}
+            <div className="absolute bottom-2 left-2 bg-neutral-950/85 backdrop-blur-md px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-2 border border-neutral-800/80 shadow-md z-10 max-w-[85%]">
+                <span className="truncate text-white max-w-[140px] sm:max-w-[200px]">
+                    {participant.name} {participant.isHost ? "(Host)" : participant.isCoHost ? "(Co-Host)" : ""}
+                </span>
+
+                {/* Speaking audio wave indicator */}
+                {isSpeaking && !participant.isMuted ? (
+                    <div className="flex items-end gap-0.5 h-3" title="Speaking">
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_100ms] h-full" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_300ms] h-2" />
+                        <span className="w-0.5 bg-emerald-400 rounded-full animate-[bounce_0.8s_infinite_200ms] h-2.5" />
+                    </div>
+                ) : participant.isMuted ? (
+                    <MicOff className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                ) : (
+                    <Mic className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                )}
+
+                {participant.isHandRaised && (
+                    <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0 animate-bounce" />
+                )}
+                {participant.isScreenSharing && <Presentation className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+            </div>
+        </div>
+    );
+};
+
+// Background Audio Sink for Remote Participants
 const ParticipantAudio: React.FC<{ participant: Participant }> = ({ participant }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -949,72 +1535,3 @@ const ParticipantAudio: React.FC<{ participant: Participant }> = ({ participant 
         />
     );
 };
-
-// Component for rendering remote participant video stream
-const RemoteVideoTile: React.FC<{
-    participant: Participant;
-    isSpeaking: boolean;
-    isSpotlight: boolean;
-    onSpotlightToggle: () => void;
-}> = ({ participant, isSpeaking, isSpotlight, onSpotlightToggle }) => {
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-
-    useEffect(() => {
-        if (participant.stream) {
-            const video = videoRef.current;
-            if (video) {
-                if (video.srcObject !== participant.stream) {
-                    video.srcObject = participant.stream;
-                }
-                if (!participant.isCameraOff) {
-                    video.play().catch((e) => {
-                        console.debug("Remote video play caught:", e);
-                    });
-                }
-            }
-        }
-    }, [participant.stream, participant.isCameraOff]);
-
-    const showAvatar = participant.isCameraOff || !participant.stream;
-
-    return (
-        <div
-            onClick={onSpotlightToggle}
-            className={`relative aspect-video w-full max-h-[75vh] bg-neutral-900 rounded-2xl overflow-hidden border-2 transition-all cursor-pointer group ${
-                isSpeaking ? "border-emerald-500 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-500/40" : "border-neutral-800"
-            }`}
-        >
-            {/* Muted video element for rendering video frames only */}
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${showAvatar ? "opacity-0 pointer-events-none absolute inset-0" : "opacity-100 block"}`}
-            />
-
-            {/* Fallback avatar overlay shown when camera is off or stream is not ready */}
-            {showAvatar && (
-                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-neutral-900">
-                    <Avatar className="h-16 w-16 border-2 border-neutral-700">
-                        <AvatarImage src={participant.avatar} />
-                        <AvatarFallback className="bg-neutral-800 text-xl font-bold text-neutral-300">
-                            {participant.name?.[0] || "P"}
-                        </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-semibold text-neutral-400">
-                        {participant.name} {participant.isCameraOff ? "(Camera Off)" : ""}
-                    </span>
-                </div>
-            )}
-
-            {/* Name Badge & Status Indicators */}
-            <div className="absolute bottom-2 left-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-2 border border-neutral-800 z-10">
-                <span className="max-w-[150px] truncate">{participant.name}</span>
-                {participant.isMuted && <MicOff className="w-3.5 h-3.5 text-red-500" />}
-                {participant.isHandRaised && <Hand className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
-            </div>
-        </div>
-    );
-};
-

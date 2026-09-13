@@ -60,36 +60,36 @@ export default function MeetLandingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 text-white flex flex-col font-sans select-none">
+        <div className="min-h-[calc(100vh-3.5rem)] bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans select-none transition-colors duration-200">
             <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 max-w-6xl mx-auto w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full my-auto">
                     {/* Left Hero Text */}
                     <div className="lg:col-span-6 flex flex-col gap-5 text-center lg:text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-950/80 border border-red-800 text-red-400 text-xs font-semibold w-fit mx-auto lg:mx-0">
-                            <Sparkles className="w-4 h-4 text-red-500" />
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800/80 text-red-600 dark:text-red-400 text-xs font-semibold w-fit mx-auto lg:mx-0 shadow-sm">
+                            <Sparkles className="w-4 h-4 text-red-600 dark:text-red-500" />
                             <span>Real-Time HD Video Calls & Meetings</span>
                         </div>
 
-                        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
+                        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
                             Connect, Collaborate &amp; Share Streamlessly.
                         </h1>
 
-                        <p className="text-sm text-gray-400 leading-relaxed">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
                             Host secure 1-to-1 and group video meetings with WebRTC audio &amp; video, screen sharing, in-call chat, and call recording.
                         </p>
 
-                        <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
-                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
-                                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                                <span className="font-semibold text-gray-300 text-center">Secure</span>
+                        <div className="grid grid-cols-3 gap-2.5 pt-1 text-xs">
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-center">Secure</span>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
-                                <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                                <span className="font-semibold text-gray-300 text-center">Moderated</span>
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-center">Moderated</span>
                             </div>
-                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-2.5 bg-neutral-900 border border-neutral-800 rounded-xl">
-                                <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
-                                <span className="font-semibold text-gray-300 text-center">No Limits</span>
+                            <div className="flex flex-col sm:flex-row items-center gap-1.5 p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm">
+                                <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-center">No Limits</span>
                             </div>
                         </div>
                     </div>
@@ -97,21 +97,21 @@ export default function MeetLandingPage() {
                     {/* Right Action Box */}
                     <div className="lg:col-span-6 flex flex-col gap-6">
                         {/* Join Room Form */}
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <LogIn className="w-5 h-5 text-red-500" /> Join an Existing Meeting
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl dark:shadow-2xl shadow-zinc-200/50 dark:shadow-black/50 flex flex-col gap-4">
+                            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                <LogIn className="w-5 h-5 text-red-600 dark:text-red-500" /> Join an Existing Meeting
                             </h2>
                             <form onSubmit={handleJoinMeeting} className="flex flex-col sm:flex-row gap-3">
                                 <Input
                                     placeholder="Enter Room ID or paste meeting link"
                                     value={joinRoomId}
                                     onChange={(e) => setJoinRoomId(e.target.value)}
-                                    className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm flex-1"
+                                    className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 rounded-xl text-sm flex-1 focus:border-red-500 dark:focus:border-red-500"
                                 />
                                 <Button
                                     type="submit"
                                     disabled={!joinRoomId.trim()}
-                                    className="bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 cursor-pointer shrink-0"
+                                    className="bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl px-6 cursor-pointer shrink-0 shadow-md shadow-red-600/20"
                                 >
                                     Join
                                 </Button>
@@ -119,26 +119,26 @@ export default function MeetLandingPage() {
                         </div>
 
                         {/* Create Room Form */}
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Plus className="w-5 h-5 text-emerald-500" /> Start a New Meeting
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xl dark:shadow-2xl shadow-zinc-200/50 dark:shadow-black/50 flex flex-col gap-4">
+                            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-emerald-600 dark:text-emerald-500" /> Start a New Meeting
                             </h2>
 
                             <form onSubmit={handleCreateMeeting} className="flex flex-col gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                                    <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
                                         Meeting Title (Optional)
                                     </label>
                                     <Input
                                         placeholder="e.g., Weekly Team Sync"
                                         value={meetingTitle}
                                         onChange={(e) => setMeetingTitle(e.target.value)}
-                                        className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm"
+                                        className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 rounded-xl text-sm focus:border-red-500 dark:focus:border-red-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                                    <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
                                         Security Passcode (Optional)
                                     </label>
                                     <Input
@@ -146,12 +146,12 @@ export default function MeetLandingPage() {
                                         placeholder="Require a passcode to join"
                                         value={passcode}
                                         onChange={(e) => setPasscode(e.target.value)}
-                                        className="bg-neutral-950 border-neutral-800 text-white rounded-xl text-sm"
+                                        className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 rounded-xl text-sm focus:border-red-500 dark:focus:border-red-500"
                                     />
                                 </div>
 
                                 {errorMsg && (
-                                    <p className="text-xs text-red-400 bg-red-950/60 p-2.5 rounded-lg border border-red-900">
+                                    <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 p-2.5 rounded-lg border border-red-200 dark:border-red-900">
                                         {errorMsg}
                                     </p>
                                 )}
@@ -159,7 +159,7 @@ export default function MeetLandingPage() {
                                 <Button
                                     type="submit"
                                     disabled={isCreating}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] mt-1"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] mt-1 shadow-lg shadow-emerald-600/20"
                                 >
                                     <Video className="w-4 h-4 fill-white" />
                                     <span>{isCreating ? "Creating Room..." : "Create Instant Meeting"}</span>
