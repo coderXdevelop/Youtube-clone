@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Channeldialogue from "./ChannelDialog";
 import DeleteChannelModal from "./DeleteChannelModal";
+import ShareModal from "./ShareModal";
 
 interface Channel {
     _id?: string;
@@ -59,7 +60,7 @@ const ChannelHeader = ({
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-    const [isCopied, setIsCopied] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
 
     const channelId = channel?._id;
     const isOwner = Boolean(user && channelId && user._id === channelId);
@@ -144,11 +145,7 @@ const ChannelHeader = ({
     };
 
     const handleShare = () => {
-        if (typeof window !== "undefined") {
-            navigator.clipboard.writeText(window.location.href);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
-        }
+        setIsShareOpen(true);
     };
 
     return (
@@ -162,20 +159,11 @@ const ChannelHeader = ({
                 <div className="absolute top-4 right-4 flex items-center gap-2">
                     <button
                         onClick={handleShare}
-                        className="px-3 py-1.5 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-md"
+                        className="px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-white/20 shadow-md active:scale-95"
                         title="Share channel link"
                     >
-                        {isCopied ? (
-                            <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>Copied!</span>
-                            </>
-                        ) : (
-                            <>
-                                <Share2 className="w-3.5 h-3.5" />
-                                <span>Share</span>
-                            </>
-                        )}
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Share</span>
                     </button>
                 </div>
             </div>
@@ -335,6 +323,13 @@ const ChannelHeader = ({
                     />
                 </>
             )}
+
+            {/* Share Channel Modal */}
+            <ShareModal
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
+                videoTitle={`Check out ${displayName}'s channel`}
+            />
         </div>
     );
 };
