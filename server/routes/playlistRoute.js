@@ -7,14 +7,15 @@ import {
     removeVideoFromPlaylist,
     deletePlaylist,
 } from "../controller/playlistController.js";
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/create", createPlaylist);
-router.get("/channel/:channelId", getChannelPlaylists);
-router.get("/:playlistId", getPlaylistById);
-router.post("/:playlistId/add-video", addVideoToPlaylist);
-router.post("/:playlistId/remove-video", removeVideoFromPlaylist);
-router.delete("/:playlistId", deletePlaylist);
+router.post("/create", requireAuth, createPlaylist);
+router.get("/channel/:channelId", optionalAuth, getChannelPlaylists);
+router.get("/:playlistId", optionalAuth, getPlaylistById);
+router.post("/:playlistId/add-video", requireAuth, addVideoToPlaylist);
+router.post("/:playlistId/remove-video", requireAuth, removeVideoFromPlaylist);
+router.delete("/:playlistId", requireAuth, deletePlaylist);
 
 export default router;

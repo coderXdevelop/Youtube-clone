@@ -39,7 +39,7 @@ interface LoginSecurityOtpModalProps {
     isOpen: boolean;
     onClose: () => void;
     challengeData: OtpChallengeData | null;
-    onSuccess: (userDoc: any, appliedTheme?: string) => void;
+    onSuccess: (userDoc: any, appliedTheme?: string, token?: string) => void;
 }
 
 export default function LoginSecurityOtpModal({
@@ -97,7 +97,7 @@ export default function LoginSecurityOtpModal({
             });
 
             if (res.data?.success && res.data?.result) {
-                onSuccess(res.data.result, res.data.appliedTheme);
+                onSuccess(res.data.result, res.data.appliedTheme, res.data.token);
                 onClose();
             } else {
                 setErrorMessage(res.data?.message || "OTP verification failed.");

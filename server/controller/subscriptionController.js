@@ -185,9 +185,10 @@ export const getSubscriptionPlans = async (req, res) => {
  * Create a new Razorpay Test Order and initiate transaction
  */
 export const createRazorpayOrder = async (req, res) => {
-    const { userId, plan, billingcycle = "monthly" } = req.body;
+    const effectiveUserId = req.userId || req.body.userId;
+    const { plan, billingcycle = "monthly" } = req.body;
 
-    if (!userId || !plan) {
+    if (!effectiveUserId || !plan) {
         return res.status(400).json({ message: "User ID and Plan are required." });
     }
 
@@ -196,7 +197,7 @@ export const createRazorpayOrder = async (req, res) => {
     }
 
     try {
-        const userDoc = await User.findById(userId);
+        const userDoc = await User.findById(effectiveUserId);
         if (!userDoc) {
             return res.status(404).json({ message: "User not found." });
         }
@@ -257,7 +258,7 @@ export const createRazorpayOrder = async (req, res) => {
 
         // Store initial transaction log in DB
         const transaction = await SubscriptionTransaction.create({
-            userid: userId,
+            userid: effectiveUserId,
             username: userDoc.name || "Subscriber",
             useremail: userDoc.email || "",
             orderid: orderId,
@@ -301,8 +302,8 @@ export const createRazorpayOrder = async (req, res) => {
  * Verify payment, activate subscription, update user profile, and return invoice
  */
 export const verifySubscriptionPayment = async (req, res) => {
+    const effectiveUserId = req.userId || req.body.userId;
     const {
-        userId,
         orderId,
         paymentId,
         signature,
@@ -311,7 +312,7 @@ export const verifySubscriptionPayment = async (req, res) => {
         paymentMethod = "Razorpay Test Gateway",
     } = req.body;
 
-    if (!userId || !orderId) {
+    if (!effectiveUserId || !orderId) {
         return res.status(400).json({ message: "Missing verification parameters." });
     }
 
@@ -360,7 +361,7 @@ export const verifySubscriptionPayment = async (req, res) => {
 
         // Update user's active subscription in MongoDB
         const updatedUser = await User.findByIdAndUpdate(
-            userId,
+            effectiveUserId,
             {
                 $set: {
                     subscriptionplan: transaction.plan,
@@ -464,14 +465,14 @@ export const getBillingHistory = async (req, res) => {
  * Cancel active subscription (preserves access until current period expires)
  */
 export const cancelUserSubscription = async (req, res) => {
-    const { userId } = req.body;
+    const effectiveUserId = req.userId || req.body.userId;
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    if (!effectiveUserId || !mongoose.Types.ObjectId.isValid(effectiveUserId)) {
         return res.status(400).json({ message: "Invalid user ID." });
     }
 
     try {
-        const userDoc = await User.findById(userId);
+        const userDoc = await User.findById(effectiveUserId);
         if (!userDoc) {
             return res.status(404).json({ message: "User not found." });
         }

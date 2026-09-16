@@ -6,13 +6,14 @@ import {
     getUserDownloads,
     deleteDownloadRecord,
 } from "../controller/downloadController.js";
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/quota/:userId", checkDownloadQuota);
-router.post("/request", requestDownload);
-router.get("/file/:videoId", downloadVideoFile);
-router.get("/history/:userId", getUserDownloads);
-router.delete("/:recordId", deleteDownloadRecord);
+router.get("/quota/:userId", optionalAuth, checkDownloadQuota);
+router.post("/request", requireAuth, requestDownload);
+router.get("/file/:videoId", optionalAuth, downloadVideoFile);
+router.get("/history/:userId", optionalAuth, getUserDownloads);
+router.delete("/:recordId", requireAuth, deleteDownloadRecord);
 
 export default router;

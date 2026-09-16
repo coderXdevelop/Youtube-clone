@@ -8,18 +8,19 @@ import {
     updateWatchProgress,
     getWatchProgress,
 } from "../controller/historyController.js";
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const routes = express.Router();
 
 // Specific routes first
-routes.post("/progress/:videoId", updateWatchProgress);
-routes.get("/progress/:userId/:videoId", getWatchProgress);
+routes.post("/progress/:videoId", optionalAuth, updateWatchProgress);
+routes.get("/progress/:userId/:videoId", optionalAuth, getWatchProgress);
 routes.post("/views/:videoId", handleview);
-routes.delete("/clear/:userId", clearHistory);
+routes.delete("/clear/:userId", requireAuth, clearHistory);
 
 // Dynamic routes
-routes.get("/:userId", getallhistoryVideo);
-routes.post("/:videoId", handlehistory);
-routes.delete("/:id", deleteHistoryItem);
+routes.get("/:userId", optionalAuth, getallhistoryVideo);
+routes.post("/:videoId", optionalAuth, handlehistory);
+routes.delete("/:id", requireAuth, deleteHistoryItem);
 
 export default routes;

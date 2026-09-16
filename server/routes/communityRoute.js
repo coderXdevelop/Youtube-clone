@@ -8,15 +8,16 @@ import {
     deletePostComment,
     deletePost,
 } from "../controller/communityController.js";
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/create", createPost);
-router.get("/channel/:channelId", getChannelPosts);
-router.post("/react/:postId", toggleReaction);
-router.post("/toggle-comments/:postId", toggleCommentsBlocked);
-router.post("/comment/:postId", addPostComment);
-router.delete("/comment/:postId/:commentId", deletePostComment);
-router.delete("/:postId", deletePost);
+router.post("/create", requireAuth, createPost);
+router.get("/channel/:channelId", optionalAuth, getChannelPosts);
+router.post("/react/:postId", requireAuth, toggleReaction);
+router.post("/toggle-comments/:postId", requireAuth, toggleCommentsBlocked);
+router.post("/comment/:postId", requireAuth, addPostComment);
+router.delete("/comment/:postId/:commentId", requireAuth, deletePostComment);
+router.delete("/:postId", requireAuth, deletePost);
 
 export default router;

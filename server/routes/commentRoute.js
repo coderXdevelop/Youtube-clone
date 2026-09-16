@@ -15,25 +15,27 @@ import {
     reviewcomment,
 } from "../controller/commentController.js";
 
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
+
 const routes = express.Router();
 
 // Public / User Comment Routes
 routes.get("/languages", getSupportedLanguages);
 routes.get("/captcha/generate", generateCaptcha);
 routes.get("/history/:id", getcommenthistory);
-routes.get("/:videoid", getallcomment);
-routes.post("/postcomment", postcomment);
-routes.post("/editcomment/:id", editcomment);
-routes.delete("/deletecomment/:id", deletecomment);
+routes.get("/:videoid", optionalAuth, getallcomment);
+routes.post("/postcomment", requireAuth, postcomment);
+routes.post("/editcomment/:id", requireAuth, editcomment);
+routes.delete("/deletecomment/:id", requireAuth, deletecomment);
 
 // Reactions & Actions
-routes.post("/like/:id", likecomment);
-routes.post("/dislike/:id", dislikecomment);
-routes.post("/report/:id", reportcomment);
+routes.post("/like/:id", requireAuth, likecomment);
+routes.post("/dislike/:id", requireAuth, dislikecomment);
+routes.post("/report/:id", requireAuth, reportcomment);
 routes.post("/translate/:id", translatecomment);
 
 // Admin Moderation Routes
-routes.get("/admin/flagged", getadminflaggedcomments);
-routes.post("/admin/review/:id", reviewcomment);
+routes.get("/admin/flagged", requireAuth, getadminflaggedcomments);
+routes.post("/admin/review/:id", requireAuth, reviewcomment);
 
 export default routes;

@@ -25,6 +25,7 @@ import {
     maskEmail,
 } from "../utils/securityUtils.js";
 import { sendSecurityOtpEmail } from "../utils/emailService.js";
+import { generateUserToken } from "../middleware/authMiddleware.js";
 
 /**
  * Enhanced Login Controller with:
@@ -116,6 +117,7 @@ export const login = async (req, res) => {
 
             return res.status(201).json({
                 result: existingUser,
+                token: generateUserToken(existingUser),
                 appliedTheme,
                 requiresOtp: false,
                 istTime: istThemeResult.istTimeString,
@@ -336,6 +338,7 @@ export const login = async (req, res) => {
 
         return res.status(200).json({
             result: existingUser,
+            token: generateUserToken(existingUser),
             appliedTheme,
             requiresOtp: false,
             istTime: istThemeResult.istTimeString,
@@ -482,6 +485,7 @@ export const verifyLoginOtp = async (req, res) => {
             success: true,
             message: "Device successfully verified and trusted.",
             result: userDoc,
+            token: generateUserToken(userDoc),
             appliedTheme,
             istTime: istThemeResult.istTimeString,
         });
@@ -562,6 +566,10 @@ export const getSecurityInfo = async (req, res) => {
         return res.status(400).json({ message: "Invalid user ID." });
     }
 
+    if (req.userId && req.userId.toString() !== _id.toString()) {
+        return res.status(403).json({ message: "Unauthorized to access another user's security records." });
+    }
+
     try {
         const userDoc = await User.findById(_id).select("-__v");
         if (!userDoc) {
@@ -601,10 +609,15 @@ export const getSecurityInfo = async (req, res) => {
  * POST /api/user/revoke-device
  */
 export const revokeTrustedDevice = async (req, res) => {
-    const { userId, deviceId } = req.body;
+    const userId = req.userId || req.body.userId;
+    const { deviceId } = req.body;
 
     if (!userId || !deviceId) {
         return res.status(400).json({ message: "User ID and Device ID are required." });
+    }
+
+    if (req.userId && req.body.userId && req.userId.toString() !== req.body.userId.toString()) {
+        return res.status(403).json({ message: "Unauthorized to revoke devices for another user." });
     }
 
     try {
@@ -632,10 +645,15 @@ export const revokeTrustedDevice = async (req, res) => {
  * POST /api/user/theme-preference
  */
 export const updateThemePreference = async (req, res) => {
-    const { userId, themePreference } = req.body;
+    const userId = req.userId || req.body.userId;
+    const { themePreference } = req.body;
 
     if (!userId || !["auto", "light", "dark"].includes(themePreference)) {
         return res.status(400).json({ message: "Valid userId and themePreference (auto, light, dark) are required." });
+    }
+
+    if (req.userId && req.body.userId && req.userId.toString() !== req.body.userId.toString()) {
+        return res.status(403).json({ message: "Unauthorized to update theme for another user." });
     }
 
     try {
@@ -672,6 +690,9 @@ export const updateprofile = async (req, res) => {
     const { channelname, description } = req.body;
     if (!mongoose.Types.ObjectId.isValid(_id)) {
         return res.status(500).json({ message: "User unavailable..." });
+    }
+    if (req.userId && req.userId.toString() !== _id.toString()) {
+        return res.status(403).json({ message: "Unauthorized to edit another user's profile." });
     }
     try {
         const updatedata = await User.findByIdAndUpdate(
@@ -721,6 +742,7 @@ export const getuserprofile = async (req, res) => {
 export const deleteChannel = async (req, res) => {
     const { id: channelId } = req.params;
     const requestingUserId =
+        req.userId ||
         req.body?.userId ||
         req.query?.userId ||
         req.headers?.["x-user-id"];

@@ -10,6 +10,7 @@ import {
     deleteChannel,
 } from "../controller/authController.js";
 import { Router } from "express";
+import { requireAuth } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -18,16 +19,16 @@ router.post("/login", login);
 router.post("/verify-login-otp", verifyLoginOtp);
 router.post("/resend-login-otp", resendLoginOtp);
 
-// Security & Session Management
-router.get("/security/:id", getSecurityInfo);
-router.post("/revoke-device", revokeTrustedDevice);
-router.post("/theme-preference", updateThemePreference);
+// Security & Session Management (Protected)
+router.get("/security/:id", requireAuth, getSecurityInfo);
+router.post("/revoke-device", requireAuth, revokeTrustedDevice);
+router.post("/theme-preference", requireAuth, updateThemePreference);
 
-// Profile & Channel Management
-router.post("/update/:id", updateprofile);
-router.patch("/update/:id", updateprofile);
-router.delete("/channel/:id", deleteChannel);
-router.delete("/delete-channel/:id", deleteChannel);
+// Profile & Channel Management (Protected)
+router.post("/update/:id", requireAuth, updateprofile);
+router.patch("/update/:id", requireAuth, updateprofile);
+router.delete("/channel/:id", requireAuth, deleteChannel);
+router.delete("/delete-channel/:id", requireAuth, deleteChannel);
 router.get("/profile/:id", getuserprofile);
 router.get("/:id", getuserprofile);
 

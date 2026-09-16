@@ -76,4 +76,8 @@ const commentschema = mongoose.Schema(
     }
 );
 
+commentschema.index({ videoid: 1, commentedon: -1 });
+commentschema.index({ userid: 1 });
+commentschema.index({ parentcommentid: 1 });
+
 export default mongoose.model("comment", commentschema);

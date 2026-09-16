@@ -100,6 +100,8 @@ const loginHistorySchema = new mongoose.Schema(
     }
 );
 
+loginHistorySchema.index({ userid: 1, logintimestamp: -1 });
+
 const LoginHistory = mongoose.model("LoginHistory", loginHistorySchema);
 
 export default LoginHistory;

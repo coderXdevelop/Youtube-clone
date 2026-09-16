@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import DownloadRecord from "../model/downloadRecord.js";
 import User from "../model/user.js";
 import video from "../model/video.js";
+import config from "../config/env.js";
 import { parseUserAgent, getClientIp } from "../utils/securityUtils.js";
 
 // Plan limits definition
@@ -129,18 +131,19 @@ export const checkDownloadQuota = async (req, res) => {
  * Authorize and record a video download attempt
  */
 export const requestDownload = async (req, res) => {
-    const { userId, videoId } = req.body;
+    const effectiveUserId = req.userId || req.body.userId;
+    const { videoId } = req.body;
 
-    if (!userId || !videoId) {
+    if (!effectiveUserId || !videoId) {
         return res.status(400).json({ message: "User ID and Video ID are required." });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(videoId)) {
+    if (!mongoose.Types.ObjectId.isValid(effectiveUserId) || !mongoose.Types.ObjectId.isValid(videoId)) {
         return res.status(400).json({ message: "Invalid user or video ID format." });
     }
 
     try {
-        const userDoc = await User.findById(userId);
+        const userDoc = await User.findById(effectiveUserId);
         if (!userDoc) {
             return res.status(404).json({ message: "User not found." });
         }
@@ -188,7 +191,7 @@ export const requestDownload = async (req, res) => {
 
         // Create download audit record
         const newRecord = new DownloadRecord({
-            userid: userId,
+            userid: effectiveUserId,
             videoid: videoId,
             videotitle: videoDoc.videotitle || "Untitled Video",
             thumbnailpath: videoDoc.thumbnailpath || "",
@@ -205,13 +208,23 @@ export const requestDownload = async (req, res) => {
 
         await newRecord.save();
 
+        // Generate signed, expiring download token for secure file streaming
+        const expiresAt = Date.now() + 120 * 1000; // 2 minutes window to start download
+        const secret = config.jwtSecret || "download_secret_salt";
+        const signature = crypto
+            .createHmac("sha256", secret)
+            .update(`${effectiveUserId}|${videoId}|${expiresAt}`)
+            .digest("hex");
+
+        const downloadUrl = `/api/download/file/${videoId}?userId=${effectiveUserId}&expires=${expiresAt}&signature=${signature}`;
+
         return res.status(200).json({
             success: true,
             message: isRedownload
                 ? "Re-download authorized (24-hour window active, quota preserved)."
                 : "Download authorized successfully.",
             record: newRecord,
-            downloadUrl: `/api/download/file/${videoId}?userId=${userId}`,
+            downloadUrl,
         });
     } catch (error) {
         console.error("requestDownload error:", error);
@@ -225,10 +238,28 @@ export const requestDownload = async (req, res) => {
  */
 export const downloadVideoFile = async (req, res) => {
     const { videoId } = req.params;
-    const { userId } = req.query;
+    const { userId, expires, signature } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(videoId)) {
         return res.status(400).send("Invalid video ID.");
+    }
+
+    // Verify presence of download authorization parameters or active token
+    if (!userId || !expires || !signature) {
+        if (!req.userId) {
+            return res.status(403).send("Download authorization required. Missing signed access token.");
+        }
+    } else {
+        // Verify HMAC signature and expiration
+        const secret = config.jwtSecret || "download_secret_salt";
+        const expectedSig = crypto
+            .createHmac("sha256", secret)
+            .update(`${userId}|${videoId}|${expires}`)
+            .digest("hex");
+
+        if (signature !== expectedSig || Date.now() > Number(expires)) {
+            return res.status(403).send("Download authorization link is invalid or expired. Please request a new download.");
+        }
     }
 
     try {

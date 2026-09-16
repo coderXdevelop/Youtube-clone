@@ -22,6 +22,52 @@ const getOrCreateDeviceId = () => {
     return devId;
 };
 
+/**
+ * Dynamically resolves client geographical location using free IP lookup or browser timeZone
+ */
+const fetchClientLocation = async () => {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch("https://ipapi.co/json/", { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.city && data.country_name) {
+                return {
+                    city: data.city,
+                    state: data.region || data.city,
+                    country: data.country_name,
+                    loc: `${data.latitude || ""},${data.longitude || ""}`,
+                };
+            }
+        }
+    } catch {}
+
+    // Fallback: estimate location from browser timezone
+    try {
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (timeZone) {
+            const parts = timeZone.split("/");
+            const city = parts[parts.length - 1].replace(/_/g, " ");
+            const isIndic = timeZone.includes("Calcutta") || timeZone.includes("Kolkata") || timeZone.includes("India");
+            return {
+                city: city || "Bengaluru",
+                state: isIndic ? "Karnataka" : (parts[0] || "State"),
+                country: isIndic ? "India" : (parts[0] || "Global"),
+                loc: "12.9716,77.5946",
+            };
+        }
+    } catch {}
+
+    return {
+        city: "Bengaluru",
+        state: "Karnataka",
+        country: "India",
+        loc: "12.9716,77.5946",
+    };
+};
+
 export const UserProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -35,10 +81,13 @@ export const UserProvider = ({ children }) => {
     // Ref to prevent duplicate/concurrent in-flight authentication requests
     const inFlightAuthRef = useRef(false);
 
-    const login = (userdata, appliedTheme) => {
+    const login = (userdata, appliedTheme, token) => {
         setUser(userdata);
         if (typeof window !== "undefined") {
             localStorage.setItem("user", JSON.stringify(userdata));
+            if (token) {
+                localStorage.setItem("yt_auth_token", token);
+            }
         }
         if (appliedTheme) {
             applyLoginTheme(appliedTheme, userdata?.themepreference || "auto");
@@ -52,6 +101,7 @@ export const UserProvider = ({ children }) => {
         setPendingFirebaseUser(null);
         if (typeof window !== "undefined") {
             localStorage.removeItem("user");
+            localStorage.removeItem("yt_auth_token");
         }
         try {
             await signOut(auth);
@@ -61,7 +111,7 @@ export const UserProvider = ({ children }) => {
     };
 
     /**
-     * Send login payload with rich device & location metadata to backend
+     * Send login payload with rich device & dynamic location metadata to backend
      */
     const authenticateWithBackend = async (firebaseuser) => {
         if (!firebaseuser?.email) return;
@@ -85,18 +135,15 @@ export const UserProvider = ({ children }) => {
 
         try {
             const deviceId = getOrCreateDeviceId();
+            const locationMeta = await fetchClientLocation();
+
             const payload = {
                 email: firebaseuser.email || "",
                 name: firebaseuser.displayName || (firebaseuser.email ? firebaseuser.email.split("@")[0] : "User"),
                 image: firebaseuser.photoURL || "https://github.com/shadcn.png",
                 deviceId,
                 userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-                clientLocation: {
-                    city: "Bengaluru",
-                    state: "Karnataka",
-                    country: "India",
-                    loc: "12.9716,77.5946",
-                },
+                clientLocation: locationMeta,
             };
 
             const response = await axiosInstance.post("/api/user/login", payload);
@@ -116,13 +163,14 @@ export const UserProvider = ({ children }) => {
 
             // Normal login success
             if (response.data?.result) {
-                login(response.data.result, response.data.appliedTheme);
+                login(response.data.result, response.data.appliedTheme, response.data.token);
             }
         } catch (error) {
             console.error("Backend auth sync error:", error);
             setUser(null);
             if (typeof window !== "undefined") {
                 localStorage.removeItem("user");
+                localStorage.removeItem("yt_auth_token");
             }
         } finally {
             inFlightAuthRef.current = false;
@@ -158,8 +206,8 @@ export const UserProvider = ({ children }) => {
         }
     };
 
-    const handleOtpSuccess = (userDoc, appliedTheme) => {
-        login(userDoc, appliedTheme);
+    const handleOtpSuccess = (userDoc, appliedTheme, token) => {
+        login(userDoc, appliedTheme, token);
         setChallengeData(null);
         setPendingFirebaseUser(null);
         setIsOtpModalOpen(false);
@@ -172,6 +220,7 @@ export const UserProvider = ({ children }) => {
         setUser(null);
         if (typeof window !== "undefined") {
             localStorage.removeItem("user");
+            localStorage.removeItem("yt_auth_token");
         }
         try {
             await signOut(auth);
@@ -188,6 +237,7 @@ export const UserProvider = ({ children }) => {
                 setUser(null);
                 if (typeof window !== "undefined") {
                     localStorage.removeItem("user");
+                    localStorage.removeItem("yt_auth_token");
                 }
             }
             setLoading(false);

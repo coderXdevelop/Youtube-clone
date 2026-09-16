@@ -128,14 +128,24 @@ export const getClientIp = (req = {}) => {
 };
 
 /**
- * Resolve client location from headers, client metadata, or default location
+ * Resolve client location from headers, proxy geo tags, client metadata, or fallback
  */
-export const getClientLocation = (clientMeta = {}) => {
+export const getClientLocation = (clientMeta = {}, req = {}) => {
+    const headers = req?.headers || {};
+    const headerCity = headers["cf-ipcity"] || headers["x-vercel-ip-city"] || headers["x-appengine-city"];
+    const headerRegion = headers["cf-region"] || headers["x-vercel-ip-country-region"] || headers["x-appengine-region"];
+    const headerCountry = headers["cf-ipcountry"] || headers["x-vercel-ip-country"] || headers["x-appengine-country"];
+
+    const city = clientMeta.city || headerCity || "Bengaluru";
+    const state = clientMeta.state || headerRegion || "Karnataka";
+    const country = clientMeta.country || headerCountry || "India";
+    const loc = clientMeta.loc || (clientMeta.lat && clientMeta.lon ? `${clientMeta.lat},${clientMeta.lon}` : "12.9716,77.5946");
+
     return {
-        city: clientMeta.city || "Bengaluru",
-        state: clientMeta.state || "Karnataka",
-        country: clientMeta.country || "India",
-        loc: clientMeta.loc || "12.9716,77.5946",
+        city,
+        state,
+        country,
+        loc,
     };
 };
 

@@ -20,6 +20,7 @@ export const config = {
     brevoApiKey: process.env.BREVO_API_KEY || "",
     brevoSenderName: process.env.BREVO_USER_NAME || "YouTube Clone",
     brevoSenderEmail: process.env.BREVO_USER_MAIL || "trackit769@gmail.com",
+    jwtSecret: process.env.JWT_SECRET || "yt_clone_jwt_super_secret_internship_key_2026",
 };
 
 export default config;

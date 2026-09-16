@@ -21,18 +21,19 @@ import {
     voiceAudioUpload,
 } from "../controller/voiceSearchController.js";
 import upload from "../filehelper/filehelper.js";
+import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const routes = express.Router();
 
-routes.post("/upload", upload.any(), UploadVideo);
+routes.post("/upload", requireAuth, upload.any(), UploadVideo);
 routes.get("/getall", getallvideo);
-routes.get("/playback-info/:id", getPlaybackInfo);
-routes.get("/hls/:id/master.m3u8", getHlsMasterPlaylist);
-routes.get("/hls/:id/:file", serveHlsStreamOrSegment);
-routes.get("/stream/:id", streamVideoAuthorized);
-routes.post("/heartbeat", recordWatchHeartbeat);
-routes.delete("/:id", deleteVideo);
-routes.delete("/delete/:id", deleteVideo);
+routes.get("/playback-info/:id", optionalAuth, getPlaybackInfo);
+routes.get("/hls/:id/master.m3u8", optionalAuth, getHlsMasterPlaylist);
+routes.get("/hls/:id/:file", optionalAuth, serveHlsStreamOrSegment);
+routes.get("/stream/:id", optionalAuth, streamVideoAuthorized);
+routes.post("/heartbeat", optionalAuth, recordWatchHeartbeat);
+routes.delete("/:id", requireAuth, deleteVideo);
+routes.delete("/delete/:id", requireAuth, deleteVideo);
 
 // Voice Search Transcription Endpoint
 routes.post("/voice-transcribe", voiceAudioUpload.single("audio"), handleVoiceTranscribe);
@@ -40,8 +41,8 @@ routes.post("/voice-transcribe", voiceAudioUpload.single("audio"), handleVoiceTr
 // Video Captions / Subtitles Endpoints
 routes.get("/captions/:id", getCaptionsByVideoId);
 routes.get("/captions/:id/vtt", serveCaptionVtt);
-routes.post("/captions/generate/:id", triggerCaptionGeneration);
-routes.post("/captions/upload/:id", upload.any(), uploadCustomCaption);
-routes.delete("/captions/:id", deleteCaption);
+routes.post("/captions/generate/:id", requireAuth, triggerCaptionGeneration);
+routes.post("/captions/upload/:id", requireAuth, upload.any(), uploadCustomCaption);
+routes.delete("/captions/:id", requireAuth, deleteCaption);
 
 export default routes;

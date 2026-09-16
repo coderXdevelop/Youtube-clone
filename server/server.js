@@ -102,7 +102,34 @@ app.use("/api/community", communityRoute);
 app.use("/api/playlist", playlistRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/meeting", meetingRoute);
-app.use("/api", paymentRoute);
+import User from "./model/user.js";
+
+// Automated Subscription Expiry Worker (audits and downgrades expired plans)
+const auditExpiredSubscriptions = async () => {
+    try {
+        const now = new Date();
+        const expiredUsers = await User.updateMany(
+            {
+                subscriptionplan: { $in: ["Bronze", "Silver", "Gold"] },
+                subscriptionexpiresat: { $lt: now },
+            },
+            {
+                $set: {
+                    subscriptionplan: "Free",
+                    subscriptionstatus: "expired",
+                },
+            }
+        );
+        if (expiredUsers.modifiedCount > 0) {
+            console.log(`[SUBSCRIPTION WORKER] Automatically downgraded ${expiredUsers.modifiedCount} expired subscription(s) to Free plan.`);
+        }
+    } catch (err) {
+        console.warn("[SUBSCRIPTION WORKER] Expiry audit error:", err.message);
+    }
+};
+
+setInterval(auditExpiredSubscriptions, 15 * 60 * 1000);
+auditExpiredSubscriptions();
 
 server.listen(config.port, () => {
     console.log(`Server is running on port ${config.port}`);

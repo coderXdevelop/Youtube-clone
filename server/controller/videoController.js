@@ -85,7 +85,7 @@ export const UploadVideo = async (req, res) => {
             categoryStr = valid.length > 0 ? valid.join(", ") : "All";
         }
 
-        const uploaderId = req.body.uploader || "";
+        const uploaderId = req.userId || req.body.uploader || "";
         let uploaderImage = "";
         if (uploaderId && mongoose.Types.ObjectId.isValid(uploaderId)) {
             const uploaderUser = await user.findById(uploaderId);
@@ -209,10 +209,14 @@ export const getallvideo = async (req, res) => {
  */
 export const deleteVideo = async (req, res) => {
     const { id } = req.params;
-    const userId = req.body?.userId || req.query?.userId || req.headers?.["x-user-id"];
+    const userId = req.userId || req.body?.userId || req.query?.userId || req.headers?.["x-user-id"];
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid video ID." });
+    }
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(401).json({ message: "Authentication required to delete video." });
     }
 
     try {
@@ -222,22 +226,21 @@ export const deleteVideo = async (req, res) => {
         }
 
         // Authorization / Ownership check
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-            const requestingUser = await user.findById(userId);
-            const isOwner =
-                targetVideo.uploader === userId ||
-                (requestingUser?.channelname &&
-                    targetVideo.videochanel?.toLowerCase() === requestingUser.channelname?.toLowerCase()) ||
-                (requestingUser?.name &&
-                    targetVideo.videochanel?.toLowerCase() === requestingUser.name?.toLowerCase());
+        const requestingUser = await user.findById(userId);
+        const isOwner =
+            targetVideo.uploader === userId ||
+            targetVideo.uploader?.toString() === userId.toString() ||
+            (requestingUser?.channelname &&
+                targetVideo.videochanel?.toLowerCase() === requestingUser.channelname?.toLowerCase()) ||
+            (requestingUser?.name &&
+                targetVideo.videochanel?.toLowerCase() === requestingUser.name?.toLowerCase());
 
-            const isAdmin =
-                requestingUser?.user_type === "admin" ||
-                requestingUser?.isadmin === true;
+        const isAdmin =
+            requestingUser?.user_type === "admin" ||
+            requestingUser?.isadmin === true;
 
-            if (!isOwner && !isAdmin) {
-                return res.status(403).json({ message: "You are not authorized to delete this video." });
-            }
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ message: "You are not authorized to delete this video." });
         }
 
         // 1. Clean up master video and all generated quality files from disk if present

@@ -23,9 +23,9 @@ const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes edit window
  */
 export const postcomment = async (req, res) => {
     try {
+        const effectiveUserId = req.userId || req.body.userid;
         const {
             videoid,
-            userid,
             commentbody,
             usercommented,
             userimage,
@@ -35,14 +35,14 @@ export const postcomment = async (req, res) => {
             captchaAnswer,
         } = req.body;
 
-        if (!videoid || !userid || !commentbody || !commentbody.trim()) {
+        if (!videoid || !effectiveUserId || !commentbody || !commentbody.trim()) {
             return res.status(400).json({ message: "Missing required comment information." });
         }
 
         const trimmedBody = commentbody.trim();
 
         // 1. Rate limiting & Flooding check
-        const rateCheck = checkRateLimit(userid);
+        const rateCheck = checkRateLimit(effectiveUserId);
         if (!rateCheck.allowed) {
             // Check if user solved CAPTCHA
             if (captchaToken && captchaAnswer && verifyCaptchaToken(captchaToken, captchaAnswer)) {
@@ -90,7 +90,7 @@ export const postcomment = async (req, res) => {
         // 6. Create comment instance
         const newComment = new comment({
             videoid,
-            userid,
+            userid: effectiveUserId,
             commentbody: trimmedBody,
             originalbody: trimmedBody,
             usercommented: usercommented || "Anonymous",
@@ -187,7 +187,8 @@ export const getallcomment = async (req, res) => {
  */
 export const editcomment = async (req, res) => {
     const { id: _id } = req.params;
-    const { commentbody, userid, version } = req.body;
+    const effectiveUserId = req.userId || req.body.userid;
+    const { commentbody, version } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(_id)) {
         return res.status(404).json({ message: "Comment unavailable." });
@@ -210,8 +211,8 @@ export const editcomment = async (req, res) => {
             return res.status(400).json({ message: "Cannot edit a deleted comment." });
         }
 
-        // Ownership verification (if userid provided)
-        if (userid && existingComment.userid.toString() !== userid.toString()) {
+        // Ownership verification
+        if (!effectiveUserId || existingComment.userid.toString() !== effectiveUserId.toString()) {
             return res.status(403).json({ message: "You are not authorized to edit this comment." });
         }
 
@@ -296,7 +297,7 @@ export const editcomment = async (req, res) => {
  */
 export const deletecomment = async (req, res) => {
     const { id: _id } = req.params;
-    const { userid } = req.body || {};
+    const effectiveUserId = req.userId || req.body?.userid;
 
     if (!mongoose.Types.ObjectId.isValid(_id)) {
         return res.status(404).send("comment unavailable");
@@ -308,8 +309,8 @@ export const deletecomment = async (req, res) => {
             return res.status(404).json({ message: "Comment not found." });
         }
 
-        // Ownership verification (if userid provided)
-        if (userid && existingComment.userid.toString() !== userid.toString()) {
+        // Ownership verification
+        if (!effectiveUserId || existingComment.userid.toString() !== effectiveUserId.toString()) {
             return res.status(403).json({ message: "You are not authorized to delete this comment." });
         }
 
@@ -387,9 +388,9 @@ export const deletecomment = async (req, res) => {
  */
 export const likecomment = async (req, res) => {
     const { id: _id } = req.params;
-    const { userid } = req.body;
+    const effectiveUserId = req.userId || req.body.userid;
 
-    if (!mongoose.Types.ObjectId.isValid(_id) || !userid) {
+    if (!mongoose.Types.ObjectId.isValid(_id) || !effectiveUserId) {
         return res.status(400).json({ message: "Invalid request parameters." });
     }
 
@@ -399,9 +400,9 @@ export const likecomment = async (req, res) => {
             return res.status(404).json({ message: "Comment not found." });
         }
 
-        const userObjectId = new mongoose.Types.ObjectId(userid);
-        const hasLiked = existingComment.likes?.some((id) => id.toString() === userid.toString());
-        const hasDisliked = existingComment.dislikes?.some((id) => id.toString() === userid.toString());
+        const userObjectId = new mongoose.Types.ObjectId(effectiveUserId);
+        const hasLiked = existingComment.likes?.some((id) => id.toString() === effectiveUserId.toString());
+        const hasDisliked = existingComment.dislikes?.some((id) => id.toString() === effectiveUserId.toString());
 
         let updateQuery = {};
 
@@ -441,9 +442,9 @@ export const likecomment = async (req, res) => {
  */
 export const dislikecomment = async (req, res) => {
     const { id: _id } = req.params;
-    const { userid } = req.body;
+    const effectiveUserId = req.userId || req.body.userid;
 
-    if (!mongoose.Types.ObjectId.isValid(_id) || !userid) {
+    if (!mongoose.Types.ObjectId.isValid(_id) || !effectiveUserId) {
         return res.status(400).json({ message: "Invalid request parameters." });
     }
 
@@ -453,9 +454,9 @@ export const dislikecomment = async (req, res) => {
             return res.status(404).json({ message: "Comment not found." });
         }
 
-        const userObjectId = new mongoose.Types.ObjectId(userid);
-        const hasLiked = existingComment.likes?.some((id) => id.toString() === userid.toString());
-        const hasDisliked = existingComment.dislikes?.some((id) => id.toString() === userid.toString());
+        const userObjectId = new mongoose.Types.ObjectId(effectiveUserId);
+        const hasLiked = existingComment.likes?.some((id) => id.toString() === effectiveUserId.toString());
+        const hasDisliked = existingComment.dislikes?.some((id) => id.toString() === effectiveUserId.toString());
 
         let updateQuery = {};
 
@@ -495,9 +496,10 @@ export const dislikecomment = async (req, res) => {
  */
 export const reportcomment = async (req, res) => {
     const { id: _id } = req.params;
-    const { userid, username, reason, details } = req.body;
+    const effectiveUserId = req.userId || req.body.userid;
+    const { username, reason, details } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(_id) || !userid || !reason) {
+    if (!mongoose.Types.ObjectId.isValid(_id) || !effectiveUserId || !reason) {
         return res.status(400).json({ message: "Missing report parameters or invalid reason." });
     }
 
@@ -509,7 +511,7 @@ export const reportcomment = async (req, res) => {
 
         // Check if user has already reported this comment
         const alreadyReported = existingComment.reports?.some(
-            (r) => r.userid?.toString() === userid.toString()
+            (r) => r.userid?.toString() === effectiveUserId.toString()
         );
 
         if (alreadyReported) {
