@@ -1,18 +1,62 @@
 "use client";
 
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
-import { useState, useEffect, useContext, createContext, useRef } from "react";
+import React, {
+    useState,
+    useEffect,
+    useContext,
+    createContext,
+    useRef,
+    ReactNode,
+} from "react";
+import {
+    onAuthStateChanged,
+    signInWithPopup,
+    signInWithRedirect,
+    signOut,
+    User as FirebaseUser,
+} from "firebase/auth";
 import { provider, auth } from "./firebase";
 import axiosInstance from "./AxiosInstance";
 import { useEnvironment } from "./EnvironmentContext";
-import LoginSecurityOtpModal, { OtpChallengeData } from "@/components/LoginSecurityOtpModal";
+import LoginSecurityOtpModal, {
+    OtpChallengeData,
+} from "@/components/LoginSecurityOtpModal";
 
-const UserContext = createContext();
+export interface UserData {
+    _id?: string;
+    email?: string;
+    name?: string;
+    image?: string;
+    channelname?: string;
+    channelName?: string;
+    description?: string;
+    discription?: string;
+    userHandle?: string;
+    subscribers?: number;
+    subscribersCount?: number;
+    subscribedChannels?: string[];
+    premiumExpiresAt?: string | null;
+    isPremium?: boolean;
+    themepreference?: string;
+    joinedon?: string | Date;
+    [key: string]: unknown;
+}
+
+export interface UserContextType {
+    user: UserData | null;
+    loading: boolean;
+    login: (userdata: UserData, appliedTheme?: string, token?: string) => void;
+    logout: () => Promise<void>;
+    handlegooglesignin: () => Promise<void>;
+    authenticateWithBackend: (firebaseuser: FirebaseUser) => Promise<void>;
+}
+
+const UserContext = createContext<UserContextType | null>(null);
 
 /**
  * Helper to get or generate persistent device ID in client localStorage
  */
-const getOrCreateDeviceId = () => {
+const getOrCreateDeviceId = (): string => {
     if (typeof window === "undefined") return "dev_server";
     let devId = localStorage.getItem("yt_device_id");
     if (!devId) {
@@ -42,7 +86,9 @@ const fetchClientLocation = async () => {
                 };
             }
         }
-    } catch {}
+    } catch {
+        // Fallback below
+    }
 
     // Fallback: estimate location from browser timezone
     try {
@@ -50,7 +96,10 @@ const fetchClientLocation = async () => {
         if (timeZone) {
             const parts = timeZone.split("/");
             const city = parts[parts.length - 1].replace(/_/g, " ");
-            const isIndic = timeZone.includes("Calcutta") || timeZone.includes("Kolkata") || timeZone.includes("India");
+            const isIndic =
+                timeZone.includes("Calcutta") ||
+                timeZone.includes("Kolkata") ||
+                timeZone.includes("India");
             return {
                 city: city || "Bengaluru",
                 state: isIndic ? "Karnataka" : (parts[0] || "State"),
@@ -58,7 +107,9 @@ const fetchClientLocation = async () => {
                 loc: "12.9716,77.5946",
             };
         }
-    } catch {}
+    } catch {
+        // Fallback below
+    }
 
     return {
         city: "Bengaluru",
@@ -68,20 +119,20 @@ const fetchClientLocation = async () => {
     };
 };
 
-export const UserProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+export const UserProvider = ({ children }: { children: ReactNode }) => {
+    const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const { applyLoginTheme } = useEnvironment();
 
     // 2FA OTP Challenge states
     const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
-    const [challengeData, setChallengeData] = useState(null);
-    const [pendingFirebaseUser, setPendingFirebaseUser] = useState(null);
+    const [challengeData, setChallengeData] = useState<OtpChallengeData | null>(null);
+    const [, setPendingFirebaseUser] = useState<FirebaseUser | null>(null);
 
     // Ref to prevent duplicate/concurrent in-flight authentication requests
     const inFlightAuthRef = useRef(false);
 
-    const login = (userdata, appliedTheme, token) => {
+    const login = (userdata: UserData, appliedTheme?: string, token?: string) => {
         setUser(userdata);
         if (typeof window !== "undefined") {
             localStorage.setItem("user", JSON.stringify(userdata));
@@ -90,7 +141,10 @@ export const UserProvider = ({ children }) => {
             }
         }
         if (appliedTheme) {
-            applyLoginTheme(appliedTheme, userdata?.themepreference || "auto");
+            applyLoginTheme(
+                (appliedTheme === "light" || appliedTheme === "dark" ? appliedTheme : "dark"),
+                (userdata?.themepreference as "auto" | "light" | "dark") || "auto"
+            );
         }
     };
 
@@ -113,7 +167,7 @@ export const UserProvider = ({ children }) => {
     /**
      * Send login payload with rich device & dynamic location metadata to backend
      */
-    const authenticateWithBackend = async (firebaseuser) => {
+    const authenticateWithBackend = async (firebaseuser: FirebaseUser) => {
         if (!firebaseuser?.email) return;
 
         // Prevent duplicate concurrent requests
@@ -139,7 +193,9 @@ export const UserProvider = ({ children }) => {
 
             const payload = {
                 email: firebaseuser.email || "",
-                name: firebaseuser.displayName || (firebaseuser.email ? firebaseuser.email.split("@")[0] : "User"),
+                name:
+                    firebaseuser.displayName ||
+                    (firebaseuser.email ? firebaseuser.email.split("@")[0] : "User"),
                 image: firebaseuser.photoURL || "https://github.com/shadcn.png",
                 deviceId,
                 userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
@@ -184,15 +240,16 @@ export const UserProvider = ({ children }) => {
             if (firebaseuser) {
                 await authenticateWithBackend(firebaseuser);
             }
-        } catch (error) {
+        } catch (error: unknown) {
+            const authError = error as { code?: string; message?: string };
             if (
-                error.code === "auth/popup-closed-by-user" ||
-                error.code === "auth/cancelled-popup-request"
+                authError.code === "auth/popup-closed-by-user" ||
+                authError.code === "auth/cancelled-popup-request"
             ) {
                 console.log("Firebase sign-in popup was closed or cancelled.");
                 return;
             }
-            if (error.code === "auth/popup-blocked") {
+            if (authError.code === "auth/popup-blocked") {
                 console.warn("Popup blocked by browser. Falling back to redirect sign-in...");
                 try {
                     await signInWithRedirect(auth, provider);
@@ -202,11 +259,11 @@ export const UserProvider = ({ children }) => {
                 }
             }
             console.error("Google sign in error:", error);
-            alert(`Google Sign-In: ${error.message || error}. Please allow popups or try again.`);
+            alert(`Google Sign-In: ${authError.message || error}. Please allow popups or try again.`);
         }
     };
 
-    const handleOtpSuccess = (userDoc, appliedTheme, token) => {
+    const handleOtpSuccess = (userDoc: UserData, appliedTheme?: string, token?: string) => {
         login(userDoc, appliedTheme, token);
         setChallengeData(null);
         setPendingFirebaseUser(null);
@@ -269,16 +326,16 @@ export const UserProvider = ({ children }) => {
     );
 };
 
-export const useUser = () => {
+export const useUser = (): UserContextType => {
     const context = useContext(UserContext);
     if (!context) {
         return {
             user: null,
             loading: false,
             login: () => {},
-            logout: () => {},
-            handlegooglesignin: () => {},
-            authenticateWithBackend: () => {},
+            logout: async () => {},
+            handlegooglesignin: async () => {},
+            authenticateWithBackend: async () => {},
         };
     }
     return context;
