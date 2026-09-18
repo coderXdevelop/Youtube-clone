@@ -50,7 +50,7 @@ export const setupMeetingSocket = (io) => {
                         allowedAudio: dbMeeting.allowedAudio !== false,
                         coHostUserIds: new Set((dbMeeting.coHosts || []).map((id) => (id._id || id).toString())),
                         participants: new Map(),
-                        maxParticipants: dbMeeting.maxParticipants || 25,
+                        maxParticipants: dbMeeting.maxParticipants || 6,
                     };
                     rooms.set(roomId, roomState);
                 }

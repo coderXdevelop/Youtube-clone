@@ -55,7 +55,7 @@ const meetingSchema = new mongoose.Schema(
         },
         maxParticipants: {
             type: Number,
-            default: 25,
+            default: 6,
         },
     },
     { timestamps: true }

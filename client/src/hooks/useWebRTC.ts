@@ -73,6 +73,31 @@ const ICE_SERVERS = {
     ],
 };
 
+// Enable Opus Discontinuous Transmission (DTX) & Forward Error Correction (FEC)
+// DTX stops sending audio packets during silence, reducing per-user audio bandwidth by ~50%
+const enableOpusDtxAndFec = (sdp: string): string => {
+    if (!sdp) return sdp;
+    try {
+        const opusMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000/i);
+        if (!opusMatch) return sdp;
+        const payloadType = opusMatch[1];
+        const fmtpRegex = new RegExp(`a=fmtp:${payloadType}\\s+(.*)`, "i");
+        if (fmtpRegex.test(sdp)) {
+            return sdp.replace(fmtpRegex, (match, params) => {
+                let updated = params;
+                if (!updated.includes("usedtx=1")) updated += ";usedtx=1";
+                if (!updated.includes("useinbandfec=1")) updated += ";useinbandfec=1";
+                return `a=fmtp:${payloadType} ${updated}`;
+            });
+        } else {
+            const rtpmapLine = new RegExp(`(a=rtpmap:${payloadType}\\s+opus\/48000\/2.*)`, "i");
+            return sdp.replace(rtpmapLine, `$1\r\na=fmtp:${payloadType} usedtx=1;useinbandfec=1`);
+        }
+    } catch {
+        return sdp;
+    }
+};
+
 export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: UseWebRTCOptions) {
     const socketRef = useRef<Socket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
@@ -420,6 +445,92 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         }
     }, [localStream, mySocketId, roomId]);
 
+    // Real-Time WebRTC Connection Quality & Telemetry Monitor
+    useEffect(() => {
+        if (!isJoined || peerConnectionsRef.current.size === 0) return;
+
+        const statsInterval = setInterval(async () => {
+            let maxRtt = 0;
+            let totalPacketsLost = 0;
+            let totalPacketsReceived = 0;
+            let activePcs = 0;
+
+            for (const pc of peerConnectionsRef.current.values()) {
+                if (pc.connectionState !== "connected") continue;
+                activePcs++;
+                try {
+                    const stats = await pc.getStats();
+                    stats.forEach((report) => {
+                        if (report.type === "candidate-pair" && report.state === "succeeded" && report.currentRoundTripTime) {
+                            const rttMs = report.currentRoundTripTime * 1000;
+                            if (rttMs > maxRtt) maxRtt = rttMs;
+                        }
+                        if (report.type === "inbound-rtp") {
+                            if (typeof report.packetsLost === "number") totalPacketsLost += report.packetsLost;
+                            if (typeof report.packetsReceived === "number") totalPacketsReceived += report.packetsReceived;
+                        }
+                    });
+                } catch {
+                    // Ignore stats retrieval failure on closed or transitioning connections
+                }
+            }
+
+            if (activePcs > 0) {
+                const totalPackets = totalPacketsLost + totalPacketsReceived;
+                const lossRate = totalPackets > 0 ? (totalPacketsLost / totalPackets) * 100 : 0;
+
+                if (maxRtt > 400 || lossRate > 12) {
+                    setConnectionQuality("Poor");
+                } else if (maxRtt > 180 || lossRate > 4) {
+                    setConnectionQuality("Fair");
+                } else {
+                    setConnectionQuality("Good");
+                }
+            }
+        }, 3000);
+
+        return () => clearInterval(statsInterval);
+    }, [isJoined]);
+
+    // Adaptive Bitrate & Resolution Management for Mesh WebRTC
+    // Scales bitrate and resolution based on active participants to avoid uplink bottleneck
+    const applyMeshBitrateConstraints = useCallback(async (pc: RTCPeerConnection, peerCount: number) => {
+        try {
+            const senders = pc.getSenders();
+            const videoSender = senders.find((s) => s.track?.kind === "video");
+            if (!videoSender || !videoSender.getParameters || !videoSender.setParameters) return;
+
+            const params = videoSender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+                params.encodings = [{}];
+            }
+
+            // In 3+ user rooms, cap video bitrate to ~550 Kbps per peer and scale resolution slightly (540p)
+            if (peerCount >= 3) {
+                params.encodings[0].maxBitrate = 550000; // 550 Kbps
+                params.encodings[0].scaleResolutionDownBy = 1.33; // 720p -> ~540p
+                params.encodings[0].maxFramerate = 24;
+            } else {
+                // 1-to-1 call: Full HD / high quality
+                params.encodings[0].maxBitrate = 1500000; // 1.5 Mbps
+                params.encodings[0].scaleResolutionDownBy = 1.0;
+                params.encodings[0].maxFramerate = 30;
+            }
+
+            await videoSender.setParameters(params);
+        } catch (e) {
+            console.debug("[WebRTC] Bitrate adaptation debug:", e);
+        }
+    }, []);
+
+    // Dynamically adjust bitrate and resolution as participants join or leave
+    useEffect(() => {
+        const totalParticipants = participants.size + 1;
+        peerConnectionsRef.current.forEach((pc) => {
+            applyMeshBitrateConstraints(pc, totalParticipants);
+        });
+    }, [participants.size, applyMeshBitrateConstraints]);
+
     // Process queued ICE candidates for a peer
     const processPendingIceCandidates = useCallback(async (targetSocketId: string, pc: RTCPeerConnection) => {
         const candidates = pendingIceCandidatesRef.current.get(targetSocketId);
@@ -732,8 +843,13 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 const pc = createPeerConnection(p.socketId, socket);
                 try {
                     const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-                    socket.emit("webrtc-offer", { targetSocketId: p.socketId, offer });
+                    const dtxOffer = {
+                        type: offer.type,
+                        sdp: enableOpusDtxAndFec(offer.sdp || ""),
+                    };
+                    await pc.setLocalDescription(dtxOffer);
+                    await applyMeshBitrateConstraints(pc, existingParticipants.length + 1);
+                    socket.emit("webrtc-offer", { targetSocketId: p.socketId, offer: pc.localDescription });
                 } catch (err) {
                     console.error("Error creating peer offer:", err);
                 }
@@ -754,17 +870,22 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             if (!localStreamRef.current) {
                 await initLocalStream();
             }
-            // Force-recreate the PC so we always answer with a clean connection
-            // that has the current local audio+video tracks attached.
-            // This prevents the bug where a stale PC (created before the
-            // local stream was ready) has no audio track, causing one-way audio.
-            const pc = createPeerConnection(senderSocketId, socket, true);
+            // Reuse healthy connection if already established (e.g. ICE restart / renegotiation);
+            // only recreate if missing or in closed/failed state
+            const existingPc = peerConnectionsRef.current.get(senderSocketId);
+            const shouldRecreate = !existingPc || existingPc.connectionState === 'closed' || existingPc.connectionState === 'failed';
+            const pc = createPeerConnection(senderSocketId, socket, shouldRecreate);
             try {
                 await pc.setRemoteDescription(new RTCSessionDescription(offer));
                 await processPendingIceCandidates(senderSocketId, pc);
                 const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit("webrtc-answer", { targetSocketId: senderSocketId, answer });
+                const dtxAnswer = {
+                    type: answer.type,
+                    sdp: enableOpusDtxAndFec(answer.sdp || ""),
+                };
+                await pc.setLocalDescription(dtxAnswer);
+                await applyMeshBitrateConstraints(pc, peerConnectionsRef.current.size + 1);
+                socket.emit("webrtc-answer", { targetSocketId: senderSocketId, answer: pc.localDescription });
             } catch (err) {
                 console.error("Error handling WebRTC offer:", err);
             }
@@ -776,6 +897,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 try {
                     await pc.setRemoteDescription(new RTCSessionDescription(answer));
                     await processPendingIceCandidates(senderSocketId, pc);
+                    await applyMeshBitrateConstraints(pc, peerConnectionsRef.current.size + 1);
                 } catch (err) {
                     console.error("Error setting remote description from answer:", err);
                 }
@@ -873,7 +995,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         });
 
         return socket;
-    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, processPendingIceCandidates, onKicked, onCallEnded, leaveRoom, toggleMute]);
+    }, [backendUrl, roomId, user, passcode, initLocalStream, createPeerConnection, processPendingIceCandidates, applyMeshBitrateConstraints, onKicked, onCallEnded, leaveRoom, toggleMute]);
 
     // Toggle Camera On/Off
     const toggleCamera = useCallback(async (forceVal?: boolean) => {
