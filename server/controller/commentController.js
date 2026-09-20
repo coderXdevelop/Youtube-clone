@@ -76,7 +76,7 @@ export const postcomment = async (req, res) => {
         }
 
         // 4. Duplicate comment check
-        const dupCheck = checkDuplicateComment(userid, trimmedBody);
+        const dupCheck = checkDuplicateComment(effectiveUserId, trimmedBody);
         if (dupCheck.isDuplicate) {
             return res.status(400).json({
                 message: dupCheck.reason,
@@ -112,15 +112,15 @@ export const postcomment = async (req, res) => {
         }
 
         // Record for rate limiting & spam prevention
-        recordRateLimitHit(userid);
-        recordCommentForSpam(userid, trimmedBody);
+        recordRateLimitHit(effectiveUserId);
+        recordCommentForSpam(effectiveUserId, trimmedBody);
 
         // Record permanent audit log
         try {
             await CommentAudit.create({
                 commentid: savedComment._id,
                 videoid,
-                userid,
+                userid: effectiveUserId,
                 username: usercommented || "Anonymous",
                 action: "created",
                 newbody: trimmedBody,
@@ -274,7 +274,7 @@ export const editcomment = async (req, res) => {
             await CommentAudit.create({
                 commentid: _id,
                 videoid: existingComment.videoid,
-                userid: userid || existingComment.userid,
+                userid: effectiveUserId || existingComment.userid,
                 username: existingComment.usercommented,
                 action: "edited",
                 previousbody: existingComment.commentbody,
@@ -329,7 +329,7 @@ export const deletecomment = async (req, res) => {
             await CommentAudit.create({
                 commentid: _id,
                 videoid: existingComment.videoid,
-                userid: userid || existingComment.userid,
+                userid: effectiveUserId || existingComment.userid,
                 username: existingComment.usercommented,
                 action: isSoft ? "soft_deleted" : "deleted",
                 previousbody: existingComment.commentbody,
@@ -345,7 +345,7 @@ export const deletecomment = async (req, res) => {
                 $set: {
                     isdeleted: true,
                     deletedat: new Date(),
-                    deletedby: userid ? userid.toString() : "author",
+                    deletedby: effectiveUserId ? effectiveUserId.toString() : "author",
                     commentbody: "[This comment has been deleted by the author]",
                     isedited: false,
                 },
@@ -522,7 +522,7 @@ export const reportcomment = async (req, res) => {
         }
 
         const reportRecord = {
-            userid: new mongoose.Types.ObjectId(userid),
+            userid: mongoose.Types.ObjectId.isValid(effectiveUserId) ? new mongoose.Types.ObjectId(effectiveUserId) : null,
             reason,
             details: details || "",
             reportedat: new Date(),
@@ -532,7 +532,7 @@ export const reportcomment = async (req, res) => {
         await CommentReport.create({
             commentid: _id,
             videoid: existingComment.videoid,
-            reportedby: userid,
+            reportedby: mongoose.Types.ObjectId.isValid(effectiveUserId) ? effectiveUserId : null,
             reportedbyname: username || "Anonymous",
             reason,
             details: details || "",
@@ -545,7 +545,7 @@ export const reportcomment = async (req, res) => {
             await CommentAudit.create({
                 commentid: _id,
                 videoid: existingComment.videoid,
-                userid,
+                userid: effectiveUserId,
                 username: username || "Anonymous",
                 action: "reported",
                 previousbody: existingComment.commentbody,
