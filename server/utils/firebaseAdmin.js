@@ -1,17 +1,24 @@
-import admin from "firebase-admin";
+import { initializeApp, cert, getApps } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import jwt from "jsonwebtoken";
 
 let isFirebaseAdminInitialized = false;
 
 try {
-    const apps = admin?.apps || admin?.default?.apps || [];
+    const apps = getApps();
     if (!apps.length) {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === "string"
-                ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-                : process.env.FIREBASE_SERVICE_ACCOUNT;
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount),
+            let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (typeof serviceAccount === "string") {
+                try {
+                    serviceAccount = JSON.parse(serviceAccount);
+                } catch (parseErr) {
+                    console.error("[FIREBASE ADMIN] Failed to parse FIREBASE_SERVICE_ACCOUNT JSON string:", parseErr.message);
+                    throw parseErr;
+                }
+            }
+            initializeApp({
+                credential: cert(serviceAccount),
             });
             isFirebaseAdminInitialized = true;
         } else if (process.env.NODE_ENV === "production") {
@@ -42,7 +49,7 @@ export const verifyFirebaseToken = async (idToken) => {
     // 1. If Firebase Admin SDK is configured with credentials, perform strict cryptographic verification
     if (isFirebaseAdminInitialized) {
         try {
-            const decoded = await admin.auth().verifyIdToken(idToken);
+            const decoded = await getAuth().verifyIdToken(idToken);
             if (decoded && decoded.email) {
                 return {
                     email: decoded.email,
