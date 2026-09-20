@@ -162,6 +162,7 @@ export default function MeetingRoomPage({ params }: MeetingRoomPageProps) {
             mySocketId={webrtc.mySocketId}
             mediaError={webrtc.mediaError}
             isMobile={webrtc.isMobile}
+            supportsScreenShare={webrtc.supportsScreenShare}
             facingMode={webrtc.facingMode}
             onRetryMediaPermissions={webrtc.retryMediaPermissions}
             onToggleMute={webrtc.toggleMute}

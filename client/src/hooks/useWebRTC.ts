@@ -123,6 +123,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
     const [isHandRaised, setIsHandRaised] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
     const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [supportsScreenShare, setSupportsScreenShare] = useState<boolean>(false);
     const [availableVideoDevices, setAvailableVideoDevices] = useState<MediaDeviceInfo[]>([]);
     const [availableAudioDevices, setAvailableAudioDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
@@ -134,7 +135,11 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
             const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera || "";
             const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
             const isTouchScreen = Boolean(navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && window.innerWidth <= 1024);
-            setIsMobile(isMobileUA || isTouchScreen);
+            const mobileDetected = Boolean(isMobileUA || isTouchScreen);
+            setIsMobile(mobileDetected);
+
+            const hasGetDisplayMedia = typeof navigator.mediaDevices !== "undefined" && typeof navigator.mediaDevices.getDisplayMedia === "function";
+            setSupportsScreenShare(!mobileDetected && hasGetDisplayMedia);
         }
     }, []);
 
@@ -1104,7 +1109,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
                 socketRef.current.emit("toggle-screenshare", { roomId, isScreenSharing: false });
             }
         } else {
-            if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+            if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia || isMobile) {
                 alert("Screen sharing is not supported by your current browser or mobile device.");
                 return;
             }
@@ -1222,6 +1227,7 @@ export function useWebRTC({ roomId, user, passcode, onKicked, onCallEnded }: Use
         mediaError,
         mediaPermissionState,
         isMobile,
+        supportsScreenShare,
         facingMode,
         availableVideoDevices,
         availableAudioDevices,

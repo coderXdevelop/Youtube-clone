@@ -61,6 +61,7 @@ interface VideoCallRoomProps {
     mySocketId: string;
     mediaError?: string | null;
     isMobile?: boolean;
+    supportsScreenShare?: boolean;
     facingMode?: "user" | "environment";
     onRetryMediaPermissions?: () => void;
     onToggleMute: () => void;
@@ -93,6 +94,7 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     mySocketId,
     mediaError,
     isMobile = false,
+    supportsScreenShare,
     facingMode = "user",
     onRetryMediaPermissions,
     onToggleMute,
@@ -110,6 +112,11 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
     const [chatInputText, setChatInputText] = useState("");
     const [unreadCount, setUnreadCount] = useState(0);
     
+    // Check if device/browser supports screen sharing
+    const canShareScreen = typeof supportsScreenShare === "boolean"
+        ? supportsScreenShare
+        : (!isMobile && typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia));
+
     // Layout and Pinning state
     const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
     const [layoutMode, setLayoutMode] = useState<"grid" | "spotlight">("grid");
@@ -994,17 +1001,19 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                         )}
                     </Button>
 
-                    <Button
-                        variant={isScreenSharing ? "default" : "ghost"}
-                        size="icon"
-                        onClick={onToggleScreenShare}
-                        className={`rounded-full h-10 w-10 cursor-pointer ${
-                            isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "text-neutral-300 hover:text-white hover:bg-neutral-800"
-                        }`}
-                        title={isScreenSharing ? "Stop Share" : "Share Screen"}
-                    >
-                        <ScreenShare className="w-5 h-5" />
-                    </Button>
+                    {canShareScreen && (
+                        <Button
+                            variant={isScreenSharing ? "default" : "ghost"}
+                            size="icon"
+                            onClick={onToggleScreenShare}
+                            className={`rounded-full h-10 w-10 cursor-pointer ${
+                                isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "text-neutral-300 hover:text-white hover:bg-neutral-800"
+                            }`}
+                            title={isScreenSharing ? "Stop Share" : "Share Screen"}
+                        >
+                            <ScreenShare className="w-5 h-5" />
+                        </Button>
+                    )}
                 </div>
 
                 {/* Desktop / Tablet: single-row layout */}
@@ -1064,17 +1073,19 @@ export const VideoCallRoom: React.FC<VideoCallRoomProps> = ({
                                 <SwitchCamera className="w-5 h-5" />
                             </Button>
                         )}
-                        <Button
-                            variant={isScreenSharing ? "default" : "secondary"}
-                            size="icon"
-                            onClick={() => onToggleScreenShare()}
-                            className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
-                                isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700/50"
-                            }`}
-                            title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
-                        >
-                            <ScreenShare className="w-5 h-5" />
-                        </Button>
+                        {canShareScreen && (
+                            <Button
+                                variant={isScreenSharing ? "default" : "secondary"}
+                                size="icon"
+                                onClick={() => onToggleScreenShare()}
+                                className={`rounded-full h-11 w-11 cursor-pointer transition-transform hover:scale-105 ${
+                                    isScreenSharing ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" : "bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700/50"
+                                }`}
+                                title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
+                            >
+                                <ScreenShare className="w-5 h-5" />
+                            </Button>
+                        )}
                         <Button
                             variant={isHandRaised ? "default" : "secondary"}
                             size="icon"
