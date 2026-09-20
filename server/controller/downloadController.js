@@ -130,12 +130,16 @@ export const checkDownloadQuota = async (req, res) => {
  * POST /api/download/request
  * Authorize and record a video download attempt
  */
+/**
+ * POST /api/download/request
+ * Authorize and record a video download attempt
+ */
 export const requestDownload = async (req, res) => {
-    const effectiveUserId = req.userId || req.body.userId;
+    const effectiveUserId = req.userId;
     const { videoId } = req.body;
 
     if (!effectiveUserId || !videoId) {
-        return res.status(400).json({ message: "User ID and Video ID are required." });
+        return res.status(400).json({ message: "Authentication and Video ID are required." });
     }
 
     if (!mongoose.Types.ObjectId.isValid(effectiveUserId) || !mongoose.Types.ObjectId.isValid(videoId)) {
@@ -159,7 +163,7 @@ export const requestDownload = async (req, res) => {
         // Check if duplicate re-download within 24h
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const recentDownload = await DownloadRecord.findOne({
-            userid: userId,
+            userid: effectiveUserId,
             videoid: videoId,
             downloadtimestamp: { $gte: twentyFourHoursAgo },
             status: "completed",
@@ -173,7 +177,7 @@ export const requestDownload = async (req, res) => {
             startOfDay.setUTCHours(0, 0, 0, 0);
 
             const todayDownloads = await DownloadRecord.find({
-                userid: userId,
+                userid: effectiveUserId,
                 downloadtimestamp: { $gte: startOfDay },
                 status: "completed",
             }).lean();
@@ -210,7 +214,7 @@ export const requestDownload = async (req, res) => {
 
         // Generate signed, expiring download token for secure file streaming
         const expiresAt = Date.now() + 120 * 1000; // 2 minutes window to start download
-        const secret = config.jwtSecret || "download_secret_salt";
+        const secret = config.jwtSecret;
         const signature = crypto
             .createHmac("sha256", secret)
             .update(`${effectiveUserId}|${videoId}|${expiresAt}`)
@@ -251,7 +255,7 @@ export const downloadVideoFile = async (req, res) => {
         }
     } else {
         // Verify HMAC signature and expiration
-        const secret = config.jwtSecret || "download_secret_salt";
+        const secret = config.jwtSecret;
         const expectedSig = crypto
             .createHmac("sha256", secret)
             .update(`${userId}|${videoId}|${expires}`)
@@ -319,13 +323,21 @@ export const downloadVideoFile = async (req, res) => {
 
 /**
  * GET /api/download/history/:userId
- * Fetch all download records for a user's Downloads section
+ * Fetch all download records for a user's Downloads section (Owner / Admin only)
  */
 export const getUserDownloads = async (req, res) => {
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    if (!req.userId) {
+        return res.status(401).json({ message: "Authentication required." });
+    }
+
+    if (req.userId.toString() !== userId.toString() && !req.user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. You can only view your own download history." });
     }
 
     try {
@@ -342,15 +354,19 @@ export const getUserDownloads = async (req, res) => {
 };
 
 /**
- * DELETE /api/download/:recordId?userId=...
- * Remove an item from the user's downloads library
+ * DELETE /api/download/:recordId
+ * Remove an item from the user's downloads library (Owner / Admin only)
  */
 export const deleteDownloadRecord = async (req, res) => {
     const { recordId } = req.params;
-    const { userId } = req.query;
+    const requestingUserId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(recordId)) {
         return res.status(400).json({ message: "Invalid record ID." });
+    }
+
+    if (!requestingUserId) {
+        return res.status(401).json({ message: "Authentication required." });
     }
 
     try {
@@ -359,7 +375,7 @@ export const deleteDownloadRecord = async (req, res) => {
             return res.status(404).json({ message: "Download record not found." });
         }
 
-        if (userId && record.userid.toString() !== userId.toString()) {
+        if (record.userid.toString() !== requestingUserId.toString() && !req.user?.isAdmin) {
             return res.status(403).json({ message: "Unauthorized to delete this record." });
         }
 

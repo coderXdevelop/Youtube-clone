@@ -10,7 +10,7 @@ import User from "../model/user.js";
 export const createPlaylist = async (req, res) => {
     try {
         const { title, description, channelId, videos, category, visibility } = req.body;
-        const requestingUserId = req.body.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!title?.trim() || !channelId) {
             return res.status(400).json({
@@ -207,7 +207,7 @@ export const addVideoToPlaylist = async (req, res) => {
     try {
         const { playlistId } = req.params;
         const { videoId } = req.body;
-        const requestingUserId = req.body.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!playlistId || !videoId) {
             return res.status(400).json({ success: false, message: "playlistId and videoId are required." });
@@ -258,7 +258,7 @@ export const removeVideoFromPlaylist = async (req, res) => {
     try {
         const { playlistId } = req.params;
         const { videoId } = req.body;
-        const requestingUserId = req.body.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!playlistId || !videoId) {
             return res.status(400).json({ success: false, message: "playlistId and videoId are required." });
@@ -306,7 +306,7 @@ export const removeVideoFromPlaylist = async (req, res) => {
 export const deletePlaylist = async (req, res) => {
     try {
         const { playlistId } = req.params;
-        const requestingUserId = req.body?.userId || req.query?.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!playlistId || !mongoose.Types.ObjectId.isValid(playlistId)) {
             return res.status(400).json({ success: false, message: "Invalid playlist ID." });
@@ -317,7 +317,7 @@ export const deletePlaylist = async (req, res) => {
             return res.status(404).json({ success: false, message: "Playlist not found." });
         }
 
-        if (!requestingUserId || playlist.channelId.toString() !== requestingUserId.toString()) {
+        if ((!requestingUserId || playlist.channelId.toString() !== requestingUserId.toString()) && !req.user?.isAdmin) {
             return res.status(403).json({
                 success: false,
                 message: "Only the channel owner can delete this playlist.",

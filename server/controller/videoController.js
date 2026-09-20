@@ -85,7 +85,7 @@ export const UploadVideo = async (req, res) => {
             categoryStr = valid.length > 0 ? valid.join(", ") : "All";
         }
 
-        const uploaderId = req.userId || req.body.uploader || "";
+        const uploaderId = req.userId;
         let uploaderImage = "";
         if (uploaderId && mongoose.Types.ObjectId.isValid(uploaderId)) {
             const uploaderUser = await user.findById(uploaderId);
@@ -209,7 +209,7 @@ export const getallvideo = async (req, res) => {
  */
 export const deleteVideo = async (req, res) => {
     const { id } = req.params;
-    const userId = req.userId || req.body?.userId || req.query?.userId || req.headers?.["x-user-id"];
+    const userId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid video ID." });
@@ -311,7 +311,7 @@ export const deleteVideo = async (req, res) => {
  */
 export const getHlsMasterPlaylist = async (req, res) => {
     const { id } = req.params;
-    const { userId } = req.query;
+    const effectiveUserId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send("Invalid video ID format.");
@@ -324,8 +324,8 @@ export const getHlsMasterPlaylist = async (req, res) => {
         }
 
         let userDoc = null;
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-            userDoc = await user.findById(userId).lean();
+        if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+            userDoc = await user.findById(effectiveUserId).lean();
         }
 
         const userPlanInfo = getActiveUserPlanInfo(userDoc);
@@ -385,7 +385,7 @@ export const getHlsMasterPlaylist = async (req, res) => {
 
         // Build filtered Master Playlist
         let masterContent = "#EXTM3U\n#EXT-X-VERSION:3\n";
-        const querySuffix = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+        const querySuffix = effectiveUserId ? `?userId=${encodeURIComponent(effectiveUserId)}` : "";
 
         for (const p of authorizedProfiles) {
             masterContent += `#EXT-X-STREAM-INF:BANDWIDTH=${p.bandwidth},RESOLUTION=${p.width}x${p.height},NAME="${p.quality}"\n`;
@@ -394,6 +394,9 @@ export const getHlsMasterPlaylist = async (req, res) => {
 
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
         res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
         return res.send(masterContent);
     } catch (error) {
         console.error("getHlsMasterPlaylist error:", error);
@@ -408,7 +411,7 @@ export const getHlsMasterPlaylist = async (req, res) => {
  */
 export const serveHlsStreamOrSegment = async (req, res) => {
     const { id, file } = req.params;
-    const { userId } = req.query;
+    const effectiveUserId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send("Invalid video ID format.");
@@ -421,8 +424,8 @@ export const serveHlsStreamOrSegment = async (req, res) => {
 
         if (requestedQuality) {
             let userDoc = null;
-            if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-                userDoc = await user.findById(userId).lean();
+            if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+                userDoc = await user.findById(effectiveUserId).lean();
             }
 
             const userPlanInfo = getActiveUserPlanInfo(userDoc);
@@ -459,13 +462,17 @@ export const serveHlsStreamOrSegment = async (req, res) => {
             return res.status(404).send("Requested HLS resource not found.");
         }
 
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
         if (safeFilename.endsWith(".m3u8")) {
             let m3u8Content = fs.readFileSync(filePath, "utf8");
-            // If userId is present, append query param to segment references so .ts requests are authorized
-            if (userId) {
+            // If effectiveUserId is present, append query param to segment references
+            if (effectiveUserId) {
                 m3u8Content = m3u8Content.replace(
                     /(stream_[0-9a-zA-Z]+_\d+\.ts)/g,
-                    `$1?userId=${encodeURIComponent(userId)}`
+                    `$1?userId=${encodeURIComponent(effectiveUserId)}`
                 );
             }
             res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
@@ -495,7 +502,7 @@ export const serveHlsStreamOrSegment = async (req, res) => {
  */
 export const getPlaybackInfo = async (req, res) => {
     const { id } = req.params;
-    const { userId } = req.query;
+    const effectiveUserId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid video ID." });
@@ -508,8 +515,8 @@ export const getPlaybackInfo = async (req, res) => {
         }
 
         let userDoc = null;
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-            userDoc = await user.findById(userId).lean();
+        if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+            userDoc = await user.findById(effectiveUserId).lean();
         }
 
         const userPlanInfo = getActiveUserPlanInfo(userDoc);
@@ -554,9 +561,8 @@ export const getPlaybackInfo = async (req, res) => {
         // Check if HLS directory or master.m3u8 exists
         const hlsDir = path.resolve(path.join("uploads", "hls", String(id)));
         const hasHls = fs.existsSync(path.join(hlsDir, "master.m3u8")) || videoDoc.hlsstatus === "completed";
-
-        const hlsStreamUrl = `/api/video/hls/${videoDoc._id}/master.m3u8${userId ? `?userId=${userId}` : ""}`;
-        const fallbackStreamUrl = `/api/video/stream/${videoDoc._id}?quality=${encodeURIComponent(userPlanInfo.maxQuality || "720p")}${userId ? `&userId=${userId}` : ""}`;
+        const hlsStreamUrl = `/api/video/hls/${videoDoc._id}/master.m3u8${effectiveUserId ? `?userId=${effectiveUserId}` : ""}`;
+        const fallbackStreamUrl = `/api/video/stream/${videoDoc._id}?quality=${encodeURIComponent(userPlanInfo.maxQuality || "720p")}${effectiveUserId ? `&userId=${effectiveUserId}` : ""}`;
 
         return res.status(200).json({
             videoId: videoDoc._id,
@@ -600,7 +606,8 @@ export const getPlaybackInfo = async (req, res) => {
  */
 export const streamVideoAuthorized = async (req, res) => {
     const { id } = req.params;
-    const { userId, quality = "720p" } = req.query;
+    const { quality = "720p" } = req.query;
+    const effectiveUserId = req.userId;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send("Invalid video ID format.");
@@ -613,8 +620,8 @@ export const streamVideoAuthorized = async (req, res) => {
         }
 
         let userDoc = null;
-        if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-            userDoc = await user.findById(userId).lean();
+        if (effectiveUserId && mongoose.Types.ObjectId.isValid(effectiveUserId)) {
+            userDoc = await user.findById(effectiveUserId).lean();
         }
 
         const userPlanInfo = getActiveUserPlanInfo(userDoc);
@@ -722,14 +729,15 @@ export const streamVideoAuthorized = async (req, res) => {
  * Body: { userId, videoId, secondsWatched, sessionId }
  */
 export const recordWatchHeartbeat = async (req, res) => {
-    const { userId, videoId, secondsWatched = 5, sessionId = "" } = req.body;
+    const effectiveUserId = req.userId || req.body?.userId;
+    const { videoId, secondsWatched = 5, sessionId = "" } = req.body || {};
 
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    if (!effectiveUserId || !mongoose.Types.ObjectId.isValid(effectiveUserId)) {
         return res.status(200).json({ allowed: true, plan: "Anonymous" });
     }
 
     try {
-        const userDoc = await user.findById(userId).lean();
+        const userDoc = await user.findById(effectiveUserId).lean();
         if (!userDoc) {
             return res.status(404).json({ message: "User not found." });
         }
@@ -750,7 +758,7 @@ export const recordWatchHeartbeat = async (req, res) => {
         const incrementSec = Math.min(30, Math.max(1, Number(secondsWatched) || 5));
 
         const updatedQuota = await DailyWatchQuota.findOneAndUpdate(
-            { userid: userId, date: todayStr },
+            { userid: effectiveUserId, date: todayStr },
             {
                 $inc: { watchedseconds: incrementSec },
                 $set: { lastheartbeat: new Date() },

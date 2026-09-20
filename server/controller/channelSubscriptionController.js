@@ -8,12 +8,12 @@ import User from "../model/user.js";
 export const toggleChannelSubscription = async (req, res) => {
     try {
         const channelId = req.params.channelId || req.body.channelId;
-        const subscriberId = req.body.subscriberId || req.body.userId || req.headers["x-user-id"];
+        const subscriberId = req.userId;
 
         if (!channelId || !subscriberId) {
             return res.status(400).json({
                 success: false,
-                message: "channelId and subscriberId are required.",
+                message: "channelId and authentication are required.",
             });
         }
 
@@ -101,7 +101,7 @@ export const toggleChannelSubscription = async (req, res) => {
 export const getChannelSubscriptionStatus = async (req, res) => {
     try {
         const { channelId } = req.params;
-        const userId = req.query.userId || req.headers["x-user-id"];
+        const userId = req.userId;
 
         if (!channelId || !mongoose.Types.ObjectId.isValid(channelId)) {
             return res.status(400).json({

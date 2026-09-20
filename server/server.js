@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
-import bodyParser from "body-parser";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import config from "./config/env.js";
 import { connectToDB } from "./model/db.js";
+import User from "./model/user.js";
 import authRoute from "./routes/authRoute.js";
 import videoRoute from "./routes/videoRoute.js";
 import commentRoute from "./routes/commentRoute.js";
@@ -15,7 +17,6 @@ import paymentRoute from "./routes/paymentRoute.js";
 import channelSubscriptionRoute from "./routes/channelSubscriptionRoute.js";
 import communityRoute from "./routes/communityRoute.js";
 import playlistRoute from "./routes/playlistRoute.js";
-
 import http from "http";
 import { Server } from "socket.io";
 import meetingRoute from "./routes/meetingRoute.js";
@@ -24,8 +25,38 @@ import { setupMeetingSocket } from "./socket/meetingHandler.js";
 connectToDB();
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 const server = http.createServer(app);
+
+// Security Headers
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+}));
+
+// Global API Rate Limiter
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500, // Limit each IP to 500 requests per 15 min window
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+    message: { message: "Too many requests from this IP, please try again later." }
+});
+app.use("/api/", apiLimiter);
+
+// Sensitive Auth / OTP Rate Limiter (Brute-force & email spam prevention)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20, // Max 20 auth/OTP attempts per 15 minutes per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+    message: { message: "Too many authentication requests. Please try again in 15 minutes." }
+});
+app.use("/api/user/login", authLimiter);
+app.use("/api/user/verify-login-otp", authLimiter);
+app.use("/api/user/resend-login-otp", authLimiter);
 
 const allowedOrigins = Array.from(new Set([
     ...config.frontendUrl.split(",").map((url) => url.trim()).filter(Boolean),
@@ -47,7 +78,7 @@ const corsOptions = {
         ) {
             return callback(null, true);
         }
-        return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
@@ -77,9 +108,8 @@ const io = new Server(server, {
 setupMeetingSocket(io);
 
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(bodyParser.json({ limit: "50mb", extended: true }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -87,8 +117,10 @@ app.use("/uploads", (req, res, next) => {
     next();
 }, express.static("uploads"));
 
+// Core API Route Mounts
 app.use("/api/user", authRoute);
 app.use("/api/video", videoRoute);
+// Compatibility alias: /video kept for legacy endpoints and external media players
 app.use("/video", videoRoute);
 app.use("/api/comment", commentRoute);
 app.use("/api/like", likeRoute);
@@ -97,12 +129,12 @@ app.use("/api/watch", watchlaterRoute);
 app.use("/api/download", downloadRoute);
 app.use("/api/subscription", subscriptionRoute);
 app.use("/api/channel-subscription", channelSubscriptionRoute);
+// Compatibility alias: /api/channel kept for channel subscription shorthands
 app.use("/api/channel", channelSubscriptionRoute);
 app.use("/api/community", communityRoute);
 app.use("/api/playlist", playlistRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/meeting", meetingRoute);
-import User from "./model/user.js";
 
 // Automated Subscription Expiry Worker (audits and downgrades expired plans)
 const auditExpiredSubscriptions = async () => {

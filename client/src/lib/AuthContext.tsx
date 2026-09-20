@@ -190,8 +190,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         try {
             const deviceId = getOrCreateDeviceId();
             const locationMeta = await fetchClientLocation();
+            let idToken = "";
+            try {
+                idToken = await firebaseuser.getIdToken();
+            } catch (tokenErr) {
+                console.warn("Could not retrieve Firebase ID token:", tokenErr);
+            }
 
             const payload = {
+                idToken,
                 email: firebaseuser.email || "",
                 name:
                     firebaseuser.displayName ||

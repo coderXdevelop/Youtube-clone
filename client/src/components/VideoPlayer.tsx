@@ -187,23 +187,25 @@ export default function VideoPlayer({
     };
   }, [video?._id, user?._id]);
 
-  // Setup HLS Stream via hls.js or Native HLS
+  // Setup HLS Stream via hls.js or Native HLS with automatic direct-stream fallback
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !video?._id) return;
 
     setPlaybackError(null);
 
-    const streamEndpoint =
-      playbackInfo?.hlsStreamUrl ||
-      playbackInfo?.streamUrl ||
-      `/api/video/hls/${video._id}/master.m3u8${user?._id ? `?userId=${user._id}` : ""}`;
-    const fullStreamUrl = getMediaUrl(streamEndpoint.replace(/^\/+/, ""));
+    const isHlsAvailable = playbackInfo ? playbackInfo.isHls === true : false;
+    const directFallbackUrl = getMediaUrl(playbackInfo?.streamUrl || `api/video/stream/${video._id}`);
 
-    if (Hls.isSupported()) {
+    if (isHlsAvailable && Hls.isSupported()) {
       if (hlsRef.current) {
         hlsRef.current.destroy();
       }
+
+      const streamEndpoint =
+        playbackInfo?.hlsStreamUrl ||
+        `/api/video/hls/${video._id}/master.m3u8`;
+      const fullStreamUrl = getMediaUrl(streamEndpoint.replace(/^\/+/, ""));
 
       const hls = new Hls({
         enableWorker: true,
@@ -237,6 +239,11 @@ export default function VideoPlayer({
             case Hls.ErrorTypes.NETWORK_ERROR:
               if (data.response?.code === 403) {
                 setPlaybackError("Access restricted. Your subscription plan does not permit this stream quality.");
+              } else if (data.details === "manifestLoadError") {
+                console.log("[HLS.js] Manifest unavailable, falling back to direct stream.");
+                hls.destroy();
+                hlsRef.current = null;
+                v.src = directFallbackUrl;
               } else {
                 hls.startLoad();
               }
@@ -246,7 +253,8 @@ export default function VideoPlayer({
               break;
             default:
               hls.destroy();
-              v.src = getMediaUrl(`api/video/stream/${video._id}?userId=${user?._id || ""}`);
+              hlsRef.current = null;
+              v.src = directFallbackUrl;
               break;
           }
         }
@@ -256,14 +264,15 @@ export default function VideoPlayer({
         hls.destroy();
         hlsRef.current = null;
       };
-    } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+    } else if (isHlsAvailable && v.canPlayType("application/vnd.apple.mpegurl")) {
       // Safari iOS native HLS
-      v.src = fullStreamUrl;
+      const streamEndpoint = playbackInfo?.hlsStreamUrl || `/api/video/hls/${video._id}/master.m3u8`;
+      v.src = getMediaUrl(streamEndpoint.replace(/^\/+/, ""));
     } else {
-      // Fallback direct stream
-      v.src = getMediaUrl(`api/video/stream/${video._id}?userId=${user?._id || ""}`);
+      // Fallback direct HTTP 206 range stream
+      v.src = directFallbackUrl;
     }
-  }, [video?._id, playbackInfo?.hlsStreamUrl, playbackInfo?.streamUrl, user?._id]);
+  }, [video?._id, playbackInfo?.isHls, playbackInfo?.hlsStreamUrl, playbackInfo?.streamUrl]);
 
   // 1. Controls auto-hide timer
   const resetControlsTimer = useCallback(() => {

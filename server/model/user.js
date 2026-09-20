@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // Admin role flag
+    isAdmin: {
+        type: Boolean,
+        default: false
+    },
     // Theme Preference: "auto" (IST time based), "light", or "dark"
     themepreference: {
         type: String,

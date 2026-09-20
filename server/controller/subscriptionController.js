@@ -185,11 +185,11 @@ export const getSubscriptionPlans = async (req, res) => {
  * Create a new Razorpay Test Order and initiate transaction
  */
 export const createRazorpayOrder = async (req, res) => {
-    const effectiveUserId = req.userId || req.body.userId;
+    const effectiveUserId = req.userId;
     const { plan, billingcycle = "monthly" } = req.body;
 
     if (!effectiveUserId || !plan) {
-        return res.status(400).json({ message: "User ID and Plan are required." });
+        return res.status(400).json({ message: "Authentication and Plan are required." });
     }
 
     if (!SUBSCRIPTION_PLANS[plan] || plan === "Free") {
@@ -233,7 +233,7 @@ export const createRazorpayOrder = async (req, res) => {
                         currency: "INR",
                         receipt: invoiceNumber,
                         notes: {
-                            userId: String(userId),
+                            userId: String(effectiveUserId),
                             plan,
                             billingcycle,
                         },
@@ -302,7 +302,7 @@ export const createRazorpayOrder = async (req, res) => {
  * Verify payment, activate subscription, update user profile, and return invoice
  */
 export const verifySubscriptionPayment = async (req, res) => {
-    const effectiveUserId = req.userId || req.body.userId;
+    const effectiveUserId = req.userId;
     const {
         orderId,
         paymentId,
@@ -313,13 +313,21 @@ export const verifySubscriptionPayment = async (req, res) => {
     } = req.body;
 
     if (!effectiveUserId || !orderId) {
-        return res.status(400).json({ message: "Missing verification parameters." });
+        return res.status(400).json({ message: "Authentication and order ID are required." });
     }
 
     try {
         const transaction = await SubscriptionTransaction.findOne({ orderid: orderId });
         if (!transaction) {
             return res.status(404).json({ message: "Transaction record not found." });
+        }
+
+        // Ownership verification: prevent order stealing/re-use by other users
+        if (transaction.userid.toString() !== effectiveUserId.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized: This payment order belongs to another user account.",
+            });
         }
 
         if (paymentStatus === "cancelled" || paymentStatus === "failed") {
@@ -333,29 +341,35 @@ export const verifySubscriptionPayment = async (req, res) => {
             });
         }
 
-        // Validate cryptographic Razorpay Signature if signature was passed from checkout
+        // Mandatory cryptographic Razorpay Signature verification with timing-safe comparison
         const sigToVerify = razorpay_signature || signature;
         const keySecret = config.razorpay.keySecret;
-        if (sigToVerify && keySecret && paymentId) {
-            const expectedSignature = crypto
-                .createHmac("sha256", keySecret)
-                .update(`${orderId}|${paymentId}`)
-                .digest("hex");
 
-            if (expectedSignature !== sigToVerify) {
-                console.warn("Razorpay signature mismatch:", { expectedSignature, sigToVerify });
-                return res.status(400).json({
-                    success: false,
-                    message: "Payment signature verification failed. Unauthorized transaction.",
-                });
-            }
+        if (!sigToVerify || !keySecret || !paymentId) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment signature, secret key, and payment ID are required for verification.",
+            });
         }
 
-        const generatedPaymentId = paymentId || `pay_rzp_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+        const expectedSignature = crypto
+            .createHmac("sha256", keySecret)
+            .update(`${orderId}|${paymentId}`)
+            .digest("hex");
+
+        const expectedBuf = Buffer.from(expectedSignature, "utf-8");
+        const actualBuf = Buffer.from(sigToVerify, "utf-8");
+
+        if (expectedBuf.length !== actualBuf.length || !crypto.timingSafeEqual(expectedBuf, actualBuf)) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment signature verification failed. Unauthorized transaction.",
+            });
+        }
 
         // Update transaction to completed
         transaction.paymentstatus = "completed";
-        transaction.paymentid = generatedPaymentId;
+        transaction.paymentid = paymentId;
         transaction.paymentmethod = paymentMethod;
         await transaction.save();
 
@@ -379,7 +393,7 @@ export const verifySubscriptionPayment = async (req, res) => {
         const invoiceReceipt = {
             invoiceNumber: transaction.invoicenumber,
             orderId: transaction.orderid,
-            paymentId: generatedPaymentId,
+            paymentId: paymentId,
             date: transaction.subscriptionstart,
             plan: transaction.plan,
             billingcycle: transaction.billingcycle,
@@ -396,7 +410,7 @@ export const verifySubscriptionPayment = async (req, res) => {
         const targetEmail = transaction.useremail || updatedUser?.email;
         if (targetEmail) {
             try {
-                const invoiceRes = await sendSubscriptionInvoiceEmail({
+                await sendSubscriptionInvoiceEmail({
                     toEmail: targetEmail,
                     customerName: transaction.username || updatedUser?.name || "Subscriber",
                     invoiceNumber: transaction.invoicenumber,
@@ -404,11 +418,10 @@ export const verifySubscriptionPayment = async (req, res) => {
                     billingcycle: transaction.billingcycle,
                     amount: transaction.amount,
                     currency: transaction.currency || "INR",
-                    paymentId: generatedPaymentId,
+                    paymentId: paymentId,
                     date: transaction.subscriptionstart || new Date(),
                     validUntil: transaction.subscriptionend,
                 });
-                console.log(`[SUBSCRIPTION] Invoice email dispatched to ${targetEmail}:`, invoiceRes);
             } catch (emailErr) {
                 console.warn(`[SUBSCRIPTION] Invoice email dispatch error:`, emailErr.message);
             }
@@ -436,13 +449,21 @@ export const verifySubscriptionPayment = async (req, res) => {
 
 /**
  * GET /api/subscription/billing-history/:userId
- * Retrieve past invoices and billing history for a user
+ * Retrieve past invoices and billing history for a user (Owner / Admin only)
  */
 export const getBillingHistory = async (req, res) => {
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    if (!req.userId) {
+        return res.status(401).json({ message: "Authentication required." });
+    }
+
+    if (req.userId.toString() !== userId.toString() && !req.user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. You can only view your own billing history." });
     }
 
     try {
@@ -465,10 +486,10 @@ export const getBillingHistory = async (req, res) => {
  * Cancel active subscription (preserves access until current period expires)
  */
 export const cancelUserSubscription = async (req, res) => {
-    const effectiveUserId = req.userId || req.body.userId;
+    const effectiveUserId = req.userId;
 
     if (!effectiveUserId || !mongoose.Types.ObjectId.isValid(effectiveUserId)) {
-        return res.status(400).json({ message: "Invalid user ID." });
+        return res.status(401).json({ message: "Authentication required." });
     }
 
     try {
@@ -490,38 +511,3 @@ export const cancelUserSubscription = async (req, res) => {
         return res.status(500).json({ message: "Failed to cancel subscription." });
     }
 };
-
-/**
- * POST /api/subscription/reset
- * Reset user subscription back to Free plan & clean up transactions
- 
-export const resetUserSubscriptionToFree = async (req, res) => {
-    const { userId } = req.body;
-
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ message: "Invalid user ID." });
-    }
-
-    try {
-        await User.findByIdAndUpdate(userId, {
-            $set: {
-                subscriptionplan: "Free",
-                subscriptionbillingcycle: "none",
-                subscriptionstartdate: null,
-                subscriptionexpiresat: null,
-                subscriptionstatus: "none",
-                lastinvoicenumber: "",
-            },
-        });
-
-        await SubscriptionTransaction.deleteMany({ userid: userId });
-
-        return res.status(200).json({
-            success: true,
-            message: "User subscription has been reset back to Free plan successfully.",
-        });
-    } catch (error) {
-        console.error("resetUserSubscriptionToFree error:", error);
-        return res.status(500).json({ message: "Failed to reset subscription." });
-    }
-};*/

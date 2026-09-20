@@ -13,7 +13,7 @@ const router = express.Router();
 router.get("/plans", optionalAuth, getSubscriptionPlans);
 router.post("/create-order", requireAuth, createRazorpayOrder);
 router.post("/verify-payment", requireAuth, verifySubscriptionPayment);
-router.get("/billing-history/:userId", optionalAuth, getBillingHistory);
+router.get("/billing-history/:userId", requireAuth, getBillingHistory);
 router.post("/cancel", requireAuth, cancelUserSubscription);
 
 export default router;

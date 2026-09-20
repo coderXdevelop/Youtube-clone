@@ -15,7 +15,7 @@ import {
     reviewcomment,
 } from "../controller/commentController.js";
 
-import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
+import { requireAuth, optionalAuth, requireAdmin } from "../middleware/authMiddleware.js";
 
 const routes = express.Router();
 
@@ -34,8 +34,8 @@ routes.post("/dislike/:id", requireAuth, dislikecomment);
 routes.post("/report/:id", requireAuth, reportcomment);
 routes.post("/translate/:id", translatecomment);
 
-// Admin Moderation Routes
-routes.get("/admin/flagged", requireAuth, getadminflaggedcomments);
-routes.post("/admin/review/:id", requireAuth, reviewcomment);
+// Admin Moderation Routes (Protected by Authentication + Admin Role)
+routes.get("/admin/flagged", requireAuth, requireAdmin, getadminflaggedcomments);
+routes.post("/admin/review/:id", requireAuth, requireAdmin, reviewcomment);
 
 export default routes;

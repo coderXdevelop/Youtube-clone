@@ -26,18 +26,41 @@ import {
 } from "../utils/securityUtils.js";
 import { sendSecurityOtpEmail } from "../utils/emailService.js";
 import { generateUserToken } from "../middleware/authMiddleware.js";
+import { verifyFirebaseToken } from "../utils/firebaseAdmin.js";
 
 /**
  * Enhanced Login Controller with:
  * 1. Time-based theme adaptation (5:00 AM - 12:00 PM IST -> Light theme, else Dark)
  * 2. Detailed security login recording (IP, browser, OS, device, location, timestamp)
  * 3. 2FA OTP challenge trigger on new browser, new device, new IP, or different location
+ * 4. Firebase token verification for server-side identity validation
  */
 export const login = async (req, res) => {
-    const { email, name, image, deviceId, clientLocation, userAgent: clientUa } = req.body;
+    const { email: rawEmail, name: rawName, image: rawImage, deviceId, clientLocation, userAgent: clientUa, idToken } = req.body;
+
+    let email = rawEmail ? rawEmail.trim().toLowerCase() : "";
+    let name = rawName;
+    let image = rawImage;
+
+    // Verify Firebase ID token if provided
+    if (idToken) {
+        try {
+            const verified = await verifyFirebaseToken(idToken);
+            if (verified?.email) {
+                email = verified.email.toLowerCase();
+                if (verified.name && !name) name = verified.name;
+                if (verified.picture && !image) image = verified.picture;
+            }
+        } catch (tokenErr) {
+            return res.status(401).json({
+                message: "Firebase identity token verification failed. Please sign in again.",
+                error: tokenErr.message,
+            });
+        }
+    }
 
     if (!email) {
-        return res.status(400).json({ message: "Email is required." });
+        return res.status(400).json({ message: "Valid email or authentication token is required." });
     }
 
     try {
@@ -741,11 +764,7 @@ export const getuserprofile = async (req, res) => {
  */
 export const deleteChannel = async (req, res) => {
     const { id: channelId } = req.params;
-    const requestingUserId =
-        req.userId ||
-        req.body?.userId ||
-        req.query?.userId ||
-        req.headers?.["x-user-id"];
+    const requestingUserId = req.userId;
     const confirmName = req.body?.confirmName || req.body?.confirmationText;
 
     if (!mongoose.Types.ObjectId.isValid(channelId)) {
@@ -765,7 +784,7 @@ export const deleteChannel = async (req, res) => {
     // Ownership check: only the channel owner (or admin) can delete the channel
     if (requestingUserId.toString() !== channelId.toString()) {
         const requestingUser = await User.findById(requestingUserId);
-        const isAdmin = requestingUser?.user_type === "admin" || requestingUser?.isadmin === true;
+        const isAdmin = req.user?.isAdmin || requestingUser?.isAdmin === true || requestingUser?.user_type === "admin";
         if (!isAdmin) {
             return res.status(403).json({
                 success: false,

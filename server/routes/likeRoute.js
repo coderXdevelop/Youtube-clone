@@ -4,7 +4,7 @@ import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const routes = express.Router();
 
-routes.get("/:userId", optionalAuth, getallLikedVideo);
+routes.get("/:userId", requireAuth, getallLikedVideo);
 routes.post("/:videoId", requireAuth, handlelike);
 routes.post("/", requireAuth, handlelike);
 routes.delete("/:id", requireAuth, deleteLikedItem);

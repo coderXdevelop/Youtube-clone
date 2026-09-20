@@ -10,10 +10,10 @@ import { requireAuth, optionalAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/quota/:userId", optionalAuth, checkDownloadQuota);
+router.get("/quota/:userId", requireAuth, checkDownloadQuota);
 router.post("/request", requireAuth, requestDownload);
 router.get("/file/:videoId", optionalAuth, downloadVideoFile);
-router.get("/history/:userId", optionalAuth, getUserDownloads);
+router.get("/history/:userId", requireAuth, getUserDownloads);
 router.delete("/:recordId", requireAuth, deleteDownloadRecord);
 
 export default router;

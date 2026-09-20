@@ -9,7 +9,7 @@ import User from "../model/user.js";
 export const createPost = async (req, res) => {
     try {
         const { channelId, content, image, tag, allowComments } = req.body;
-        const requestingUserId = req.body.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!channelId || !content?.trim()) {
             return res.status(400).json({
@@ -77,7 +77,7 @@ export const createPost = async (req, res) => {
 export const getChannelPosts = async (req, res) => {
     try {
         const { channelId } = req.params;
-        const currentUserId = req.query.userId || req.headers["x-user-id"];
+        const currentUserId = req.userId;
 
         if (!channelId || !mongoose.Types.ObjectId.isValid(channelId)) {
             return res.status(400).json({
@@ -133,7 +133,7 @@ export const toggleReaction = async (req, res) => {
     try {
         const { postId } = req.params;
         const { reactionType } = req.body; // 'like' or 'dislike'
-        const userId = req.body.userId || req.headers["x-user-id"];
+        const userId = req.userId;
 
         if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).json({ success: false, message: "Invalid post ID." });
@@ -204,7 +204,7 @@ export const toggleReaction = async (req, res) => {
 export const toggleCommentsBlocked = async (req, res) => {
     try {
         const { postId } = req.params;
-        const requestingUserId = req.body.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
         const explicitState = req.body.allowComments;
 
         if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
@@ -251,7 +251,7 @@ export const addPostComment = async (req, res) => {
     try {
         const { postId } = req.params;
         const { text, userName, userImage } = req.body;
-        const userId = req.body.userId || req.headers["x-user-id"];
+        const userId = req.userId;
 
         if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).json({ success: false, message: "Invalid post ID." });
@@ -311,7 +311,7 @@ export const addPostComment = async (req, res) => {
 export const deletePostComment = async (req, res) => {
     try {
         const { postId, commentId } = req.params;
-        const requestingUserId = req.body?.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!postId || !commentId) {
             return res.status(400).json({ success: false, message: "postId and commentId are required." });
@@ -327,11 +327,12 @@ export const deletePostComment = async (req, res) => {
             return res.status(404).json({ success: false, message: "Comment not found." });
         }
 
-        // Authorization: Comment Author OR Channel Owner can delete
+        // Authorization: Comment Author OR Channel Owner OR Admin can delete
         const isAuthor = requestingUserId && targetComment.userId.toString() === requestingUserId.toString();
         const isChannelOwner = requestingUserId && post.channelId.toString() === requestingUserId.toString();
+        const isAdmin = req.user?.isAdmin;
 
-        if (!isAuthor && !isChannelOwner) {
+        if (!isAuthor && !isChannelOwner && !isAdmin) {
             return res.status(403).json({
                 success: false,
                 message: "You are not authorized to delete this comment.",
@@ -362,7 +363,7 @@ export const deletePostComment = async (req, res) => {
 export const deletePost = async (req, res) => {
     try {
         const { postId } = req.params;
-        const requestingUserId = req.body?.userId || req.query?.userId || req.headers["x-user-id"];
+        const requestingUserId = req.userId;
 
         if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
             return res.status(400).json({ success: false, message: "Invalid post ID." });
@@ -373,7 +374,7 @@ export const deletePost = async (req, res) => {
             return res.status(404).json({ success: false, message: "Post not found." });
         }
 
-        if (!requestingUserId || post.channelId.toString() !== requestingUserId.toString()) {
+        if ((!requestingUserId || post.channelId.toString() !== requestingUserId.toString()) && !req.user?.isAdmin) {
             return res.status(403).json({
                 success: false,
                 message: "Only the channel owner can delete this announcement.",
