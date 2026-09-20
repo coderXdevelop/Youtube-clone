@@ -44,6 +44,7 @@ const apiLimiter = rateLimit({
     message: { message: "Too many requests from this IP, please try again later." }
 });
 app.use("/api/", apiLimiter);
+app.use("/video", apiLimiter);
 
 // Sensitive Auth / OTP Rate Limiter (Brute-force & email spam prevention)
 const authLimiter = rateLimit({
@@ -60,6 +61,7 @@ app.use("/api/user/resend-login-otp", authLimiter);
 
 const allowedOrigins = Array.from(new Set([
     ...config.frontendUrl.split(",").map((url) => url.trim()).filter(Boolean),
+    "https://ytcloneclient.onrender.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",

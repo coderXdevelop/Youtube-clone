@@ -20,11 +20,9 @@ const getTranscriber = async () => {
     if (!cachedTranscriber) {
         try {
             const { pipeline } = await import("@xenova/transformers");
-            console.log("[CaptionService] 🎙️ Initializing Whisper speech-to-text pipeline (Xenova/whisper-tiny)...");
             cachedTranscriber = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
                 quantized: true,
             });
-            console.log("[CaptionService] ✅ Whisper pipeline ready.");
         } catch (err) {
             console.warn("[CaptionService] ⚠️ Could not load @xenova/transformers locally:", err.message);
             cachedTranscriber = null;
@@ -139,7 +137,6 @@ const transcribeWithGroq = async (wavPath) => {
     if (!apiKey) return null;
 
     try {
-        console.log("[CaptionService] 🚀 Transcribing via Groq Whisper API (whisper-large-v3)...");
         const fileStream = fs.createReadStream(wavPath);
         const stats = fs.statSync(wavPath);
 
@@ -214,7 +211,6 @@ const transcribeWithLocalWhisper = async (wavPath) => {
             audioData = new Float32Array(audioData);
         }
 
-        console.log(`[CaptionService] 🧠 Running local Whisper inference on audio samples (${audioData.length} samples)...`);
         const output = await transcriber(audioData, {
             chunk_length_s: 30,
             stride_length_s: 0,
@@ -274,8 +270,6 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
     let captionRecord = null;
 
     try {
-        console.log(`[CaptionService] 🎬 Starting caption generation for video ${videoIdStr}...`);
-
         // Find or create Caption database record
         captionRecord = await caption.findOne({ videoid: videoId, language });
         if (!captionRecord) {
@@ -310,7 +304,6 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
         const relativeVttPath = `uploads/captions/${videoIdStr}_${language}.vtt`.replace(/\\/g, "/");
 
         // 1. Extract 16kHz mono audio
-        console.log(`[CaptionService] 🔊 Extracting 16kHz audio to ${tempWavPath}...`);
         await extractAudioForStt(absoluteVideoPath, tempWavPath);
 
         // 2. Perform STT (Groq Cloud API if configured, otherwise local Whisper)
@@ -343,7 +336,6 @@ export const generateCaptionsForVideo = async (videoId, videoFilePath, userId = 
         captionRecord.vttpath = relativeVttPath;
         await captionRecord.save();
 
-        console.log(`[CaptionService] 🎉 Successfully generated ${cues.length} caption cues for video ${videoIdStr}!`);
         return captionRecord;
     } catch (error) {
         console.error(`[CaptionService] ❌ Caption generation failed for video ${videoIdStr}:`, error);
@@ -371,7 +363,6 @@ export const transcribeAudioQuery = async (audioFilePath) => {
     );
 
     try {
-        console.log(`[CaptionService] 🎙️ Processing voice search query from ${audioFilePath}...`);
         // 1. Extract/convert to 16kHz mono WAV
         await extractAudioForStt(audioFilePath, tempWavPath);
 

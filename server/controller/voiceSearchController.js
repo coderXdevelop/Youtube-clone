@@ -42,7 +42,6 @@ export const handleVoiceTranscribe = async (req, res) => {
         }
 
         filePath = req.file.path;
-        console.log(`[VoiceSearchController] 🎙️ Received voice query file: ${filePath} (${req.file.size} bytes)`);
 
         const transcribedText = await transcribeAudioQuery(filePath);
 

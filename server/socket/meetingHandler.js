@@ -92,7 +92,6 @@ export const setupMeetingSocket = (io) => {
                 if (userIdStr && userIdStr !== "anonymous") {
                     for (const [existingSocketId, existingParticipant] of roomState.participants.entries()) {
                         if (existingParticipant.userId === userIdStr && existingSocketId !== socket.id) {
-                            console.log(`[Socket] Cleaning up previous socket ${existingSocketId} for user ${userIdStr}`);
                             io.to(roomId).emit("user-left", {
                                 socketId: existingSocketId,
                                 userId: existingParticipant.userId,

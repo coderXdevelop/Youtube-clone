@@ -98,6 +98,23 @@ const createTestApp = () => {
         res.json({ success: true, admin: true });
     });
 
+    // Login route under test
+    app.post("/api/test/login", (req, res) => {
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(401).json({ message: "Firebase ID token is required." });
+        }
+        try {
+            const decoded = jwt.decode(idToken);
+            if (!decoded || !decoded.email) {
+                return res.status(401).json({ message: "Invalid token payload." });
+            }
+            return res.status(200).json({ success: true, email: decoded.email });
+        } catch {
+            return res.status(401).json({ message: "Verification failed." });
+        }
+    });
+
     // Error handler for CORS
     app.use((err, req, res, next) => {
         if (err.message === "Not allowed by CORS") {
@@ -230,4 +247,33 @@ test("Security Test Suite", async (t) => {
         assert.equal(res.status, 200);
         assert.equal(res.body.success, true);
     });
+
+    await t.test("11. Login rejects requests missing Firebase ID token with 401", async () => {
+        const res = await request(app)
+            .post("/api/test/login")
+            .send({ email: "victim@example.com" });
+
+        assert.equal(res.status, 401);
+        assert.equal(res.body.message, "Firebase ID token is required.");
+    });
+
+    await t.test("12. Login succeeds when Firebase ID token is provided", async () => {
+        const mockFirebaseToken = jwt.sign(
+            {
+                iss: "https://securetoken.google.com/demo-project",
+                sub: "firebase_user_123",
+                email: "authenticated@example.com",
+            },
+            "firebase_mock_secret",
+            { expiresIn: "1h" }
+        );
+
+        const res = await request(app)
+            .post("/api/test/login")
+            .send({ idToken: mockFirebaseToken });
+
+        assert.equal(res.status, 200);
+        assert.equal(res.body.email, "authenticated@example.com");
+    });
 });
+

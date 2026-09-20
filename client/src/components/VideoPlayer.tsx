@@ -211,6 +211,12 @@ export default function VideoPlayer({
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 90,
+        xhrSetup: (xhr) => {
+          const token = typeof window !== "undefined" ? localStorage.getItem("yt_auth_token") : null;
+          if (token) {
+            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+          }
+        },
       });
 
       hlsRef.current = hls;

@@ -88,6 +88,7 @@ PORT=5000
 MONGODB_URI="mongodb://localhost:27017/youtube-clone"
 FRONTEND_URL="http://localhost:3000"
 JWT_SECRET="your_jwt_secret_key_here"
+FIREBASE_SERVICE_ACCOUNT='{"type":"service_account","project_id":"your-project-id",...}'
 RAZORPAY_KEY_ID="your_razorpay_key_id"
 RAZORPAY_KEY_SECRET="your_razorpay_key_secret"
 BREVO_API_KEY="your_brevo_api_key"

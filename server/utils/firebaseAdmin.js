@@ -7,22 +7,25 @@ try {
     const apps = admin?.apps || admin?.default?.apps || [];
     if (!apps.length) {
         if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === "string"
+                ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+                : process.env.FIREBASE_SERVICE_ACCOUNT;
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
             });
             isFirebaseAdminInitialized = true;
-        } else if (process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) {
-            const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-            admin.initializeApp({
-                projectId,
-            });
-            isFirebaseAdminInitialized = true;
+        } else if (process.env.NODE_ENV === "production") {
+            throw new Error("FIREBASE_SERVICE_ACCOUNT is required in production for secure token verification.");
+        } else {
+            console.warn("[FIREBASE ADMIN] Running in development/test mode without FIREBASE_SERVICE_ACCOUNT credentials.");
         }
     } else {
         isFirebaseAdminInitialized = true;
     }
 } catch (err) {
+    if (process.env.NODE_ENV === "production") {
+        throw err;
+    }
     console.warn("[FIREBASE ADMIN] Initialization notice:", err.message);
 }
 
@@ -36,7 +39,7 @@ export const verifyFirebaseToken = async (idToken) => {
         throw new Error("Missing Firebase ID token.");
     }
 
-    // 1. If Firebase Admin SDK is fully configured with credentials, perform strict cryptographic verification
+    // 1. If Firebase Admin SDK is configured with credentials, perform strict cryptographic verification
     if (isFirebaseAdminInitialized) {
         try {
             const decoded = await admin.auth().verifyIdToken(idToken);
@@ -52,6 +55,11 @@ export const verifyFirebaseToken = async (idToken) => {
             console.warn("[FIREBASE ADMIN] verifyIdToken error:", adminErr.message);
             throw new Error(`Invalid or expired Firebase ID token: ${adminErr.message}`);
         }
+    }
+
+    // In production, refuse to proceed if Admin SDK is uninitialized
+    if (process.env.NODE_ENV === "production") {
+        throw new Error("Firebase Admin SDK is not initialized. Token verification rejected in production.");
     }
 
     // 2. Fallback token decode & claims verification (for local development / test without full service account key)

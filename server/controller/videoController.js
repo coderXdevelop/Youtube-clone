@@ -385,11 +385,10 @@ export const getHlsMasterPlaylist = async (req, res) => {
 
         // Build filtered Master Playlist
         let masterContent = "#EXTM3U\n#EXT-X-VERSION:3\n";
-        const querySuffix = effectiveUserId ? `?userId=${encodeURIComponent(effectiveUserId)}` : "";
 
         for (const p of authorizedProfiles) {
             masterContent += `#EXT-X-STREAM-INF:BANDWIDTH=${p.bandwidth},RESOLUTION=${p.width}x${p.height},NAME="${p.quality}"\n`;
-            masterContent += `stream_${p.quality}.m3u8${querySuffix}\n`;
+            masterContent += `stream_${p.quality}.m3u8\n`;
         }
 
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
@@ -467,14 +466,7 @@ export const serveHlsStreamOrSegment = async (req, res) => {
         res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
         if (safeFilename.endsWith(".m3u8")) {
-            let m3u8Content = fs.readFileSync(filePath, "utf8");
-            // If effectiveUserId is present, append query param to segment references
-            if (effectiveUserId) {
-                m3u8Content = m3u8Content.replace(
-                    /(stream_[0-9a-zA-Z]+_\d+\.ts)/g,
-                    `$1?userId=${encodeURIComponent(effectiveUserId)}`
-                );
-            }
+            const m3u8Content = fs.readFileSync(filePath, "utf8");
             res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
             res.setHeader("Cache-Control", "no-cache");
             return res.send(m3u8Content);
@@ -561,8 +553,8 @@ export const getPlaybackInfo = async (req, res) => {
         // Check if HLS directory or master.m3u8 exists
         const hlsDir = path.resolve(path.join("uploads", "hls", String(id)));
         const hasHls = fs.existsSync(path.join(hlsDir, "master.m3u8")) || videoDoc.hlsstatus === "completed";
-        const hlsStreamUrl = `/api/video/hls/${videoDoc._id}/master.m3u8${effectiveUserId ? `?userId=${effectiveUserId}` : ""}`;
-        const fallbackStreamUrl = `/api/video/stream/${videoDoc._id}?quality=${encodeURIComponent(userPlanInfo.maxQuality || "720p")}${effectiveUserId ? `&userId=${effectiveUserId}` : ""}`;
+        const hlsStreamUrl = `/api/video/hls/${videoDoc._id}/master.m3u8`;
+        const fallbackStreamUrl = `/api/video/stream/${videoDoc._id}?quality=${encodeURIComponent(userPlanInfo.maxQuality || "720p")}`;
 
         return res.status(200).json({
             videoId: videoDoc._id,

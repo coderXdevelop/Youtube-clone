@@ -38,25 +38,27 @@ import { verifyFirebaseToken } from "../utils/firebaseAdmin.js";
 export const login = async (req, res) => {
     const { email: rawEmail, name: rawName, image: rawImage, deviceId, clientLocation, userAgent: clientUa, idToken } = req.body;
 
-    let email = rawEmail ? rawEmail.trim().toLowerCase() : "";
+    if (!idToken) {
+        return res.status(401).json({ message: "Firebase ID token is required." });
+    }
+
+    let email = "";
     let name = rawName;
     let image = rawImage;
 
-    // Verify Firebase ID token if provided
-    if (idToken) {
-        try {
-            const verified = await verifyFirebaseToken(idToken);
-            if (verified?.email) {
-                email = verified.email.toLowerCase();
-                if (verified.name && !name) name = verified.name;
-                if (verified.picture && !image) image = verified.picture;
-            }
-        } catch (tokenErr) {
-            return res.status(401).json({
-                message: "Firebase identity token verification failed. Please sign in again.",
-                error: tokenErr.message,
-            });
+    // Verify Firebase ID token
+    try {
+        const verified = await verifyFirebaseToken(idToken);
+        if (verified?.email) {
+            email = verified.email.toLowerCase();
+            if (verified.name && !name) name = verified.name;
+            if (verified.picture && !image) image = verified.picture;
         }
+    } catch (tokenErr) {
+        return res.status(401).json({
+            message: "Firebase identity token verification failed. Please sign in again.",
+            error: tokenErr.message,
+        });
     }
 
     if (!email) {
@@ -200,9 +202,6 @@ export const login = async (req, res) => {
                 existingChallenge &&
                 now.getTime() - new Date(existingChallenge.createdAt).getTime() < CHALLENGE_REUSE_WINDOW_MS
             ) {
-                console.log(
-                    `[SECURITY] Reusing active OTP Challenge for ${email} (${existingChallenge.challengeid}) to avoid duplicate OTP generation.`
-                );
                 return res.status(200).json({
                     requiresOtp: true,
                     challengeId: existingChallenge.challengeid,
@@ -282,11 +281,9 @@ export const login = async (req, res) => {
                 logintimestamp: new Date(),
             });
 
-            console.log(`[SECURITY] OTP Challenge generated for ${email}: ${otpCode} (Reason: ${reasonString})`);
-
             // Dispatch transactional security OTP email via Brevo
             try {
-                const emailRes = await sendSecurityOtpEmail({
+                await sendSecurityOtpEmail({
                     toEmail: email,
                     userName: existingUser.name || email.split("@")[0],
                     otpCode,
@@ -299,7 +296,6 @@ export const login = async (req, res) => {
                         location: `${locationMeta.city}, ${locationMeta.state}, ${locationMeta.country}`,
                     },
                 });
-                console.log(`[SECURITY] OTP Email dispatched to ${email}:`, emailRes);
             } catch (emailErr) {
                 console.warn(`[SECURITY] Background OTP email dispatch error:`, emailErr.message);
             }
@@ -544,8 +540,6 @@ export const resendLoginOtp = async (req, res) => {
         challenge.attempts = 0;
         challenge.expiresat = new Date(Date.now() + 10 * 60 * 1000);
         await challenge.save();
-
-        console.log(`[SECURITY] Resent OTP for ${challenge.useremail}: ${newOtp}`);
 
         // Dispatch transactional security OTP email via Brevo
         try {
